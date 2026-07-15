@@ -16,49 +16,36 @@ export type Database = {
     Tables: {
       campaign_services: {
         Row: {
-          assigned_csr_id: string
           company_id: string
           created_at: string
           id: string
           name: string | null
           rate_type: Database["public"]["Enums"]["rate_type"] | null
           seat_count: number
-          service_type: Database["public"]["Enums"]["service_tier"] | null
-          source_type: Database["public"]["Enums"]["source_type"]
+          texting_tier: Database["public"]["Enums"]["texting_tier"] | null
           type: Database["public"]["Enums"]["campaign_type"]
         }
         Insert: {
-          assigned_csr_id: string
           company_id: string
           created_at?: string
           id?: string
           name?: string | null
           rate_type?: Database["public"]["Enums"]["rate_type"] | null
           seat_count: number
-          service_type?: Database["public"]["Enums"]["service_tier"] | null
-          source_type: Database["public"]["Enums"]["source_type"]
+          texting_tier?: Database["public"]["Enums"]["texting_tier"] | null
           type: Database["public"]["Enums"]["campaign_type"]
         }
         Update: {
-          assigned_csr_id?: string
           company_id?: string
           created_at?: string
           id?: string
           name?: string | null
           rate_type?: Database["public"]["Enums"]["rate_type"] | null
           seat_count?: number
-          service_type?: Database["public"]["Enums"]["service_tier"] | null
-          source_type?: Database["public"]["Enums"]["source_type"]
+          texting_tier?: Database["public"]["Enums"]["texting_tier"] | null
           type?: Database["public"]["Enums"]["campaign_type"]
         }
         Relationships: [
-          {
-            foreignKeyName: "campaign_services_assigned_csr_id_fkey"
-            columns: ["assigned_csr_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "campaign_services_company_id_fkey"
             columns: ["company_id"]
@@ -109,71 +96,64 @@ export type Database = {
           },
         ]
       }
-      commissions: {
+      companies: {
         Row: {
-          amount: number
+          assigned_csr_id: string | null
           created_at: string
-          created_by: string
-          csr_id: string
+          data_source_tier:
+            | Database["public"]["Enums"]["data_source_tier"]
+            | null
+          data_source_type: Database["public"]["Enums"]["provider_type"]
           id: string
-          month: string
-          source_note: string
-          type: Database["public"]["Enums"]["commission_type"]
+          name: string
+          package_price: number | null
+          skip_trace_rate: number | null
+          skip_trace_rate_tier:
+            | Database["public"]["Enums"]["skip_trace_rate_tier"]
+            | null
+          skip_tracing_type: Database["public"]["Enums"]["provider_type"]
         }
         Insert: {
-          amount: number
+          assigned_csr_id?: string | null
           created_at?: string
-          created_by: string
-          csr_id: string
+          data_source_tier?:
+            | Database["public"]["Enums"]["data_source_tier"]
+            | null
+          data_source_type: Database["public"]["Enums"]["provider_type"]
           id?: string
-          month: string
-          source_note: string
-          type: Database["public"]["Enums"]["commission_type"]
+          name: string
+          package_price?: number | null
+          skip_trace_rate?: number | null
+          skip_trace_rate_tier?:
+            | Database["public"]["Enums"]["skip_trace_rate_tier"]
+            | null
+          skip_tracing_type: Database["public"]["Enums"]["provider_type"]
         }
         Update: {
-          amount?: number
+          assigned_csr_id?: string | null
           created_at?: string
-          created_by?: string
-          csr_id?: string
+          data_source_tier?:
+            | Database["public"]["Enums"]["data_source_tier"]
+            | null
+          data_source_type?: Database["public"]["Enums"]["provider_type"]
           id?: string
-          month?: string
-          source_note?: string
-          type?: Database["public"]["Enums"]["commission_type"]
+          name?: string
+          package_price?: number | null
+          skip_trace_rate?: number | null
+          skip_trace_rate_tier?:
+            | Database["public"]["Enums"]["skip_trace_rate_tier"]
+            | null
+          skip_tracing_type?: Database["public"]["Enums"]["provider_type"]
         }
         Relationships: [
           {
-            foreignKeyName: "commissions_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "commissions_csr_id_fkey"
-            columns: ["csr_id"]
+            foreignKeyName: "companies_assigned_csr_id_fkey"
+            columns: ["assigned_csr_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
-      }
-      companies: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-        }
-        Relationships: []
       }
       data_lists: {
         Row: {
@@ -185,6 +165,8 @@ export type Database = {
           list_date: string
           records_accepted: number
           records_count: number
+          records_skip_traced: number | null
+          skip_trace_rate: number
         }
         Insert: {
           campaign_service_id: string
@@ -195,6 +177,8 @@ export type Database = {
           list_date: string
           records_accepted: number
           records_count: number
+          records_skip_traced?: number | null
+          skip_trace_rate?: number
         }
         Update: {
           campaign_service_id?: string
@@ -205,6 +189,8 @@ export type Database = {
           list_date?: string
           records_accepted?: number
           records_count?: number
+          records_skip_traced?: number | null
+          skip_trace_rate?: number
         }
         Relationships: [
           {
@@ -217,6 +203,83 @@ export type Database = {
           {
             foreignKeyName: "data_lists_entered_by_fkey"
             columns: ["entered_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      upsells: {
+        Row: {
+          campaign_service_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string
+          csr_id: string
+          from_tier: string | null
+          id: string
+          notes: string | null
+          quantity: number
+          to_tier: string | null
+          total_amount: number | null
+          unit_amount: number
+          upsell_type: Database["public"]["Enums"]["upsell_type"]
+        }
+        Insert: {
+          campaign_service_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by: string
+          csr_id: string
+          from_tier?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number
+          to_tier?: string | null
+          total_amount?: number | null
+          unit_amount: number
+          upsell_type: Database["public"]["Enums"]["upsell_type"]
+        }
+        Update: {
+          campaign_service_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          csr_id?: string
+          from_tier?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number
+          to_tier?: string | null
+          total_amount?: number | null
+          unit_amount?: number
+          upsell_type?: Database["public"]["Enums"]["upsell_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upsells_campaign_service_id_fkey"
+            columns: ["campaign_service_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upsells_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upsells_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upsells_csr_id_fkey"
+            columns: ["csr_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -265,13 +328,30 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      get_commissions: {
+        Args: { p_month: string }
+        Returns: {
+          csr_id: string
+          csr_name: string
+          data_commission: number
+          total_commission: number
+          upsell_commission: number
+        }[]
+      }
     }
     Enums: {
       campaign_type: "cold_calling" | "texting"
-      commission_type: "data" | "upsell"
+      data_source_tier: "package" | "payg" | "legacy"
+      provider_type: "res" | "self_provided"
       rate_type: "standard" | "promo"
-      service_tier: "starter" | "pro" | "growth" | "legacy" | "payg"
-      source_type: "res" | "self_provided"
+      skip_trace_rate_tier: "0.09" | "0.07" | "0.0525" | "custom"
+      texting_tier: "50k" | "75k" | "100k"
+      upsell_type:
+        | "add_cc_seat"
+        | "add_texting_service"
+        | "dwy_lm"
+        | "dfy_lm"
+        | "texting_package_upgrade"
       user_role: "csr" | "tl" | "hod" | "admin" | "sysadmin"
       user_status: "invited" | "active"
     }
@@ -402,10 +482,18 @@ export const Constants = {
   public: {
     Enums: {
       campaign_type: ["cold_calling", "texting"],
-      commission_type: ["data", "upsell"],
+      data_source_tier: ["package", "payg", "legacy"],
+      provider_type: ["res", "self_provided"],
       rate_type: ["standard", "promo"],
-      service_tier: ["starter", "pro", "growth", "legacy", "payg"],
-      source_type: ["res", "self_provided"],
+      skip_trace_rate_tier: ["0.09", "0.07", "0.0525", "custom"],
+      texting_tier: ["50k", "75k", "100k"],
+      upsell_type: [
+        "add_cc_seat",
+        "add_texting_service",
+        "dwy_lm",
+        "dfy_lm",
+        "texting_package_upgrade",
+      ],
       user_role: ["csr", "tl", "hod", "admin", "sysadmin"],
       user_status: ["invited", "active"],
     },

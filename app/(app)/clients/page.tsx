@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Table,
   TableHeader,
@@ -10,11 +11,17 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import {
   CAMPAIGN_TYPE_LABELS,
-  SOURCE_TYPE_LABELS,
-  SERVICE_TIER_LABELS,
+  PROVIDER_TYPE_LABELS,
+  DATA_SOURCE_TIER_LABELS,
   RATE_TYPE_LABELS,
+  TEXTING_TIER_LABELS,
 } from "@/lib/supabase/labels";
 import type { Database } from "@/lib/supabase/database.types";
+
+function formatPrice(value: number | null) {
+  if (value === null) return "—";
+  return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
 
 type CampaignType = Database["public"]["Enums"]["campaign_type"];
 
@@ -34,10 +41,20 @@ function TypeIndicator({ type }: { type: CampaignType }) {
 
 export default async function ClientsPage() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: callerProfile } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", user?.id ?? "")
+    .single();
+
   const { data: services } = await supabase
     .from("campaign_services")
     .select(
-      "id, type, name, seat_count, source_type, service_type, rate_type, company:companies(id, name)"
+      "id, type, name, seat_count, texting_tier, rate_type, company:companies(id, name, data_source_type, data_source_tier, package_price)"
     )
     .order("created_at", { ascending: true });
 
@@ -45,11 +62,21 @@ export default async function ClientsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="font-heading text-xl text-ink">Clients</h1>
-        <p className="text-sm text-ink-muted">
-          {rows.length} active campaign service{rows.length === 1 ? "" : "s"}
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-xl text-ink">Clients</h1>
+          <p className="text-sm text-ink-muted">
+            {rows.length} active campaign service{rows.length === 1 ? "" : "s"}
+          </p>
+        </div>
+        {callerProfile?.role === "admin" && (
+          <Link
+            href="/data-lists/new"
+            className={buttonVariants({ variant: "default" })}
+          >
+            + New Data List
+          </Link>
+        )}
       </div>
 
       <div className="border border-border bg-surface-raised">
@@ -60,9 +87,9 @@ export default async function ClientsPage() {
               <TableHead>Campaign</TableHead>
               <TableHead>Type</TableHead>
               <TableHead className="text-right">Seats</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Service Tier</TableHead>
+              <TableHead>Data Source</TableHead>
               <TableHead>Rate</TableHead>
+              <TableHead className="text-right">Price</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -86,19 +113,29 @@ export default async function ClientsPage() {
                       {cs.company.name}
                     </Link>
                   </TableCell>
-                  <TableCell>{cs.name ?? "—"}</TableCell>
+                  <TableCell>
+                    {cs.name ??
+                      (cs.type === "texting" && cs.texting_tier
+                        ? `Texting — ${TEXTING_TIER_LABELS[cs.texting_tier]}`
+                        : "—")}
+                  </TableCell>
                   <TableCell>
                     <TypeIndicator type={cs.type} />
                   </TableCell>
                   <TableCell className="text-right tabular">
                     {cs.seat_count}
                   </TableCell>
-                  <TableCell>{SOURCE_TYPE_LABELS[cs.source_type]}</TableCell>
                   <TableCell>
-                    {cs.service_type ? SERVICE_TIER_LABELS[cs.service_type] : "—"}
+                    {PROVIDER_TYPE_LABELS[cs.company.data_source_type]}
+                    {cs.company.data_source_tier
+                      ? ` · ${DATA_SOURCE_TIER_LABELS[cs.company.data_source_tier]}`
+                      : ""}
                   </TableCell>
                   <TableCell>
                     {cs.rate_type ? RATE_TYPE_LABELS[cs.rate_type] : "—"}
+                  </TableCell>
+                  <TableCell className="text-right tabular">
+                    {formatPrice(cs.company.package_price)}
                   </TableCell>
                 </TableRow>
               ))

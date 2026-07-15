@@ -10,11 +10,18 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import {
   CAMPAIGN_TYPE_LABELS,
-  SOURCE_TYPE_LABELS,
-  SERVICE_TIER_LABELS,
+  PROVIDER_TYPE_LABELS,
+  DATA_SOURCE_TIER_LABELS,
   RATE_TYPE_LABELS,
+  TEXTING_TIER_LABELS,
 } from "@/lib/supabase/labels";
+import { LogUpsellToggle } from "@/components/upsells/log-upsell-toggle";
 import type { Database } from "@/lib/supabase/database.types";
+
+function formatPrice(value: number | null) {
+  if (value === null) return "—";
+  return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
 
 type CampaignType = Database["public"]["Enums"]["campaign_type"];
 
@@ -39,12 +46,23 @@ export default async function CompanyProfilePage({
 }) {
   const { companyId } = await params;
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: callerProfile } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", user?.id ?? "")
+    .single();
 
   // RLS scopes this to companies the signed-in user can see, so a CSR
   // navigating to a company outside their assignment hits notFound().
   const { data: company } = await supabase
     .from("companies")
-    .select("id, name")
+    .select(
+      "id, name, data_source_type, data_source_tier, skip_tracing_type, skip_trace_rate, package_price"
+    )
     .eq("id", companyId)
     .single();
 
@@ -55,7 +73,7 @@ export default async function CompanyProfilePage({
       supabase
         .from("campaign_services")
         .select(
-          "id, type, name, seat_count, source_type, service_type, rate_type"
+          "id, type, name, seat_count, texting_tier, rate_type"
         )
         .eq("company_id", companyId)
         .order("created_at", { ascending: true }),
@@ -95,6 +113,25 @@ export default async function CompanyProfilePage({
           {campaignServices.length} campaign services ·{" "}
           <span className="tabular">{totalSeats}</span> total seats
         </p>
+        <p className="mt-1 text-sm text-ink-muted">
+          Data source: {PROVIDER_TYPE_LABELS[company.data_source_type]}
+          {company.data_source_tier
+            ? ` · ${DATA_SOURCE_TIER_LABELS[company.data_source_tier]}`
+            : ""}
+          {company.package_price !== null
+            ? ` · ${formatPrice(company.package_price)}/mo`
+            : ""}
+          {" · "}
+          Skip tracing: {PROVIDER_TYPE_LABELS[company.skip_tracing_type]}
+          {company.skip_trace_rate !== null
+            ? ` · ${formatPrice(company.skip_trace_rate)}/record`
+            : ""}
+        </p>
+        {callerProfile?.role === "csr" && (
+          <div className="mt-4">
+            <LogUpsellToggle companyId={companyId} campaignServices={campaignServices} />
+          </div>
+        )}
       </div>
 
       <section>
@@ -108,8 +145,6 @@ export default async function CompanyProfilePage({
                 <TableHead>Campaign</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead className="text-right">Seats</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Service Tier</TableHead>
                 <TableHead>Rate</TableHead>
               </TableRow>
             </TableHeader>
@@ -120,17 +155,16 @@ export default async function CompanyProfilePage({
                   className={i % 2 === 1 ? "bg-surface-sunken/50" : undefined}
                 >
                   <TableCell className="font-medium text-ink">
-                    {cs.name ?? "—"}
+                    {cs.name ??
+                      (cs.type === "texting" && cs.texting_tier
+                        ? `Texting — ${TEXTING_TIER_LABELS[cs.texting_tier]}`
+                        : "—")}
                   </TableCell>
                   <TableCell>
                     <TypeIndicator type={cs.type} />
                   </TableCell>
                   <TableCell className="text-right tabular">
                     {cs.seat_count}
-                  </TableCell>
-                  <TableCell>{SOURCE_TYPE_LABELS[cs.source_type]}</TableCell>
-                  <TableCell>
-                    {cs.service_type ? SERVICE_TIER_LABELS[cs.service_type] : "—"}
                   </TableCell>
                   <TableCell>
                     {cs.rate_type ? RATE_TYPE_LABELS[cs.rate_type] : "—"}

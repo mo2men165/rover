@@ -11,15 +11,17 @@ type InviteUserInput = {
   email: string;
   name: string;
   role: UserRole;
+  phone?: string;
+  startDate?: string;
 };
 
 type InviteUserResult =
   | { success: true }
   | { success: false; error: string };
 
-// Sysadmin-only. Not yet wired to any UI form (creating-users UI is next
-// sprint) — this is the backend flow the future "invite user" form will
-// call.
+// Sysadmin-only. Creates the auth user and profile row together — the
+// UI treats this as a distinct, explicit "Send Invite" step, separate
+// from filling out the form (see app/(app)/users/new).
 export async function inviteUser(
   input: InviteUserInput
 ): Promise<InviteUserResult> {
@@ -65,6 +67,8 @@ export async function inviteUser(
     name: input.name,
     email: input.email,
     role: input.role,
+    phone: input.phone || null,
+    start_date: input.startDate || null,
     status: "invited",
   });
 
