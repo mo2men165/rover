@@ -1,0 +1,191 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-display);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* ROVER named palette */
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ledger: var(--ledger);
+  --color-clay: var(--clay);
+  --color-sage: var(--sage);
+  --color-rust: var(--rust);
+  --color-surface-sunken: var(--surface-sunken);
+
+  /* dark metallic additions */
+  --color-void: var(--void);
+  --color-surface: var(--surface);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+}
+
+:root {
+  /* ROVER primitives — dark metallic. Brand blue sampled from
+     public/Logo - Color.png (#30A9DF). */
+  --void: #080b12;
+  --surface: #0f141e;
+  --surface-raised-start: #161d2c;
+  --surface-raised-end: #1e2740;
+  --surface-sunken: #131a27;
+  --paper: var(--void);
+  --ink: #edf1f5;
+  --ink-muted: #7c93a8;
+  --ledger: #30a9df;
+  --brand-blue: #30a9df;
+  --brand-blue-deep: #1b6e96;
+  --clay: #c98a3f;
+  --sage: #33c481;
+  --rust: #e5484d;
+  --metallic-edge: #2b3a52;
+  --chrome-a: #e4e7ec;
+  --chrome-b: #9aa1ac;
+  --chrome-c: #c7ccd3;
+
+  /* shadcn semantic mapping */
+  --background: var(--void);
+  --foreground: var(--ink);
+  --card: var(--surface-raised-start);
+  --card-foreground: var(--ink);
+  --popover: var(--surface-raised-start);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand-blue);
+  --primary-foreground: #05141d;
+  --secondary: var(--surface-sunken);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-sunken);
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--clay);
+  --accent-foreground: #1a1206;
+  --destructive: var(--rust);
+  --border: rgba(48, 169, 223, 0.16);
+  --input: rgba(48, 169, 223, 0.22);
+  --ring: var(--brand-blue);
+  --radius: 0.625rem;
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--brand-blue);
+  --sidebar-primary-foreground: #05141d;
+  --sidebar-accent: var(--surface-sunken);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: rgba(48, 169, 223, 0.16);
+  --sidebar-ring: var(--brand-blue);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer utilities {
+  .font-heading {
+    font-family: var(--font-display);
+  }
+  .tabular {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bg-surface-raised {
+    background-image: linear-gradient(
+      var(--gradient-angle, 135deg),
+      var(--surface-raised-start),
+      var(--surface-raised-end)
+    );
+  }
+
+  .border-metallic {
+    position: relative;
+    border: 1px solid transparent;
+    background-image:
+      linear-gradient(var(--surface-raised-start), var(--surface-raised-start)),
+      linear-gradient(135deg, var(--metallic-edge), var(--brand-blue), var(--metallic-edge));
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
+  }
+
+  .text-chrome {
+    background-image: linear-gradient(
+      135deg,
+      var(--chrome-a),
+      var(--chrome-b),
+      var(--chrome-c)
+    );
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+
+  .glow-blue {
+    box-shadow:
+      0 0 0 1px rgba(48, 169, 223, 0.3),
+      0 0 20px 0 rgba(48, 169, 223, 0.35);
+  }
+
+  .shine-mask {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shine-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      115deg,
+      transparent 35%,
+      rgba(255, 255, 255, 0.35) 50%,
+      transparent 65%
+    );
+    transform: translateX(-120%);
+    will-change: transform;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shine-layer {
+    display: none;
+  }
+}
