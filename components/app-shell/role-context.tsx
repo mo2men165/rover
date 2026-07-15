@@ -21,8 +21,14 @@ type RoleContextValue = {
 
 const RoleContext = createContext<RoleContextValue | null>(null);
 
-export function RoleProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<Role>("csr");
+export function RoleProvider({
+  children,
+  initialRole = "csr",
+}: {
+  children: ReactNode;
+  initialRole?: Role;
+}) {
+  const [role, setRole] = useState<Role>(initialRole);
   return (
     <RoleContext.Provider value={{ role, setRole }}>
       {children}

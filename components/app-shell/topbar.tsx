@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRole, ROLE_LABELS, ALL_ROLES } from "@/components/app-shell/role-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -11,9 +12,25 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { createClient } from "@/lib/supabase/client";
 
-export function Topbar() {
+function initialsOf(name: string) {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase();
+}
+
+export function Topbar({ userName }: { userName: string }) {
+  const router = useRouter();
   const { role, setRole } = useRole();
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-end border-b border-border bg-surface px-6">
@@ -40,15 +57,15 @@ export function Topbar() {
           <DropdownMenuTrigger className="cursor-pointer rounded-full border-metallic">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-[linear-gradient(135deg,var(--brand-blue),var(--brand-blue-deep))] text-xs text-white">
-                JD
+                {initialsOf(userName)}
               </AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuGroup>
-              <DropdownMenuLabel>Jane Doe</DropdownMenuLabel>
+              <DropdownMenuLabel>{userName}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem disabled>Log out</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>

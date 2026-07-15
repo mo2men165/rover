@@ -1,60 +1,53 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { gradientDrift, shineSweep } from "@/lib/motion";
 import { createClient } from "@/lib/supabase/client";
+import { activateCurrentUser } from "@/lib/actions/activate-user";
 
-const URL_ERROR_MESSAGES: Record<string, string> = {
-  "no-profile":
-    "Your account isn't fully set up yet. Contact your System Administrator.",
-  "invite-link-expired":
-    "That invite link is no longer valid. Ask your System Administrator to resend it.",
-};
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginPageContent />
-    </Suspense>
-  );
-}
-
-function LoginPageContent() {
+export default function SetPasswordPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const heroRef = useRef<HTMLDivElement>(null);
   const heroShineRef = useRef<HTMLSpanElement>(null);
-  const urlError = searchParams.get("error");
-  const [error, setError] = useState<string | null>(
-    urlError ? (URL_ERROR_MESSAGES[urlError] ?? null) : null
-  );
+  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email"));
     const password = String(formData.get("password"));
+    const confirmPassword = String(formData.get("confirmPassword"));
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords don't match.");
+      return;
+    }
+
+    setSubmitting(true);
 
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
+    const { error: updateError } = await supabase.auth.updateUser({
       password,
     });
 
-    if (signInError) {
-      setError("That email and password combination didn't work.");
+    if (updateError) {
+      setError("Couldn't set your password. Try again.");
       setSubmitting(false);
       return;
     }
+
+    await activateCurrentUser();
 
     router.push("/clients");
     router.refresh();
@@ -135,36 +128,41 @@ function LoginPageContent() {
             <p className="mt-1 text-sm text-ink-muted">Customer Success Hub</p>
           </div>
 
-          <p className="mb-6 hidden text-xs font-medium uppercase tracking-[0.2em] text-ink-muted md:block">
-            Sign in
+          <p className="mb-2 hidden text-xs font-medium uppercase tracking-[0.2em] text-ink-muted md:block">
+            Set your password
+          </p>
+          <p className="mb-6 text-sm text-ink-muted">
+            Choose a password to finish setting up your account.
           </p>
 
           <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="email" className="text-sm text-ink">
-                Email
-              </Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="username"
-                placeholder="name@res-va.com"
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
               <Label htmlFor="password" className="text-sm text-ink">
-                Password
+                New password
               </Label>
               <Input
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 placeholder="••••••••"
                 required
+                minLength={8}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="confirmPassword" className="text-sm text-ink">
+                Confirm password
+              </Label>
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                placeholder="••••••••"
+                required
+                minLength={8}
               />
             </div>
 
@@ -175,14 +173,9 @@ function LoginPageContent() {
             )}
 
             <Button type="submit" pulse disabled={submitting} className="mt-2 w-full">
-              {submitting ? "Signing in…" : "Sign in"}
+              {submitting ? "Setting password…" : "Set password & continue"}
             </Button>
           </form>
-
-          <p className="mt-6 text-center text-xs text-ink-muted">
-            Access is by invitation only. Contact your System Administrator if
-            you need an account.
-          </p>
         </div>
       </div>
     </div>

@@ -7,10 +7,19 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { campaignServices, companies } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/server";
+import {
+  CAMPAIGN_TYPE_LABELS,
+  SOURCE_TYPE_LABELS,
+  SERVICE_TIER_LABELS,
+  RATE_TYPE_LABELS,
+} from "@/lib/supabase/labels";
+import type { Database } from "@/lib/supabase/database.types";
 
-function TypeIndicator({ type }: { type: "Cold Calling" | "Texting" }) {
-  const isCold = type === "Cold Calling";
+type CampaignType = Database["public"]["Enums"]["campaign_type"];
+
+function TypeIndicator({ type }: { type: CampaignType }) {
+  const isCold = type === "cold_calling";
   return (
     <span
       className={`inline-flex items-center gap-1.5 text-sm ${isCold ? "text-ledger" : "text-clay"}`}
@@ -18,18 +27,28 @@ function TypeIndicator({ type }: { type: "Cold Calling" | "Texting" }) {
       <span
         className={`h-1.5 w-1.5 rounded-full ${isCold ? "bg-ledger" : "bg-clay"}`}
       />
-      {type}
+      {CAMPAIGN_TYPE_LABELS[type]}
     </span>
   );
 }
 
-export default function ClientsPage() {
+export default async function ClientsPage() {
+  const supabase = await createClient();
+  const { data: services } = await supabase
+    .from("campaign_services")
+    .select(
+      "id, type, name, seat_count, source_type, service_type, rate_type, company:companies(id, name)"
+    )
+    .order("created_at", { ascending: true });
+
+  const rows = services ?? [];
+
   return (
     <div>
       <div className="mb-6">
         <h1 className="font-heading text-xl text-ink">Clients</h1>
         <p className="text-sm text-ink-muted">
-          {campaignServices.length} active campaign services
+          {rows.length} active campaign service{rows.length === 1 ? "" : "s"}
         </p>
       </div>
 
@@ -41,38 +60,49 @@ export default function ClientsPage() {
               <TableHead>Campaign</TableHead>
               <TableHead>Type</TableHead>
               <TableHead className="text-right">Seats</TableHead>
-              <TableHead>Service Type</TableHead>
-              <TableHead>Rate Type</TableHead>
+              <TableHead>Source</TableHead>
+              <TableHead>Service Tier</TableHead>
+              <TableHead>Rate</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {campaignServices.map((cs, i) => {
-              const company = companies.find((c) => c.slug === cs.companySlug)!;
-              return (
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-16 text-center text-sm text-ink-muted">
+                  No campaign services assigned to you yet.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((cs, i) => (
                 <TableRow
                   key={cs.id}
                   className={i % 2 === 1 ? "bg-surface-sunken/50" : undefined}
                 >
                   <TableCell>
                     <Link
-                      href={`/clients/${company.slug}`}
+                      href={`/clients/${cs.company.id}`}
                       className="font-medium text-ledger hover:underline"
                     >
-                      {company.name}
+                      {cs.company.name}
                     </Link>
                   </TableCell>
-                  <TableCell>{cs.campaignName}</TableCell>
+                  <TableCell>{cs.name ?? "—"}</TableCell>
                   <TableCell>
                     <TypeIndicator type={cs.type} />
                   </TableCell>
                   <TableCell className="text-right tabular">
-                    {cs.seats}
+                    {cs.seat_count}
                   </TableCell>
-                  <TableCell>{cs.serviceType}</TableCell>
-                  <TableCell>{cs.rateType}</TableCell>
+                  <TableCell>{SOURCE_TYPE_LABELS[cs.source_type]}</TableCell>
+                  <TableCell>
+                    {cs.service_type ? SERVICE_TIER_LABELS[cs.service_type] : "—"}
+                  </TableCell>
+                  <TableCell>
+                    {cs.rate_type ? RATE_TYPE_LABELS[cs.rate_type] : "—"}
+                  </TableCell>
                 </TableRow>
-              );
-            })}
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
