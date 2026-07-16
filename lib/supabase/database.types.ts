@@ -57,36 +57,89 @@ export type Database = {
       }
       clients: {
         Row: {
+          assigned_csr_id: string | null
           company_id: string
           created_at: string
+          data_source_tier:
+            | Database["public"]["Enums"]["data_source_tier"]
+            | null
+          data_source_type: Database["public"]["Enums"]["provider_type"] | null
           email: string | null
           id: string
           is_poc: boolean
           name: string
+          package_end_date: string | null
+          package_price: number | null
+          package_start_date: string | null
+          package_tier: Database["public"]["Enums"]["package_tier"] | null
           phone: string | null
+          skip_trace_rate: number | null
+          skip_trace_rate_tier:
+            | Database["public"]["Enums"]["skip_trace_rate_tier"]
+            | null
+          skip_tracing_type: Database["public"]["Enums"]["provider_type"] | null
           title_at_company: string | null
         }
         Insert: {
+          assigned_csr_id?: string | null
           company_id: string
           created_at?: string
+          data_source_tier?:
+            | Database["public"]["Enums"]["data_source_tier"]
+            | null
+          data_source_type?: Database["public"]["Enums"]["provider_type"] | null
           email?: string | null
           id?: string
           is_poc?: boolean
           name: string
+          package_end_date?: string | null
+          package_price?: number | null
+          package_start_date?: string | null
+          package_tier?: Database["public"]["Enums"]["package_tier"] | null
           phone?: string | null
+          skip_trace_rate?: number | null
+          skip_trace_rate_tier?:
+            | Database["public"]["Enums"]["skip_trace_rate_tier"]
+            | null
+          skip_tracing_type?:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           title_at_company?: string | null
         }
         Update: {
+          assigned_csr_id?: string | null
           company_id?: string
           created_at?: string
+          data_source_tier?:
+            | Database["public"]["Enums"]["data_source_tier"]
+            | null
+          data_source_type?: Database["public"]["Enums"]["provider_type"] | null
           email?: string | null
           id?: string
           is_poc?: boolean
           name?: string
+          package_end_date?: string | null
+          package_price?: number | null
+          package_start_date?: string | null
+          package_tier?: Database["public"]["Enums"]["package_tier"] | null
           phone?: string | null
+          skip_trace_rate?: number | null
+          skip_trace_rate_tier?:
+            | Database["public"]["Enums"]["skip_trace_rate_tier"]
+            | null
+          skip_tracing_type?:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           title_at_company?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "clients_assigned_csr_id_fkey"
+            columns: ["assigned_csr_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "clients_company_id_fkey"
             columns: ["company_id"]
@@ -98,66 +151,54 @@ export type Database = {
       }
       companies: {
         Row: {
-          assigned_csr_id: string | null
           created_at: string
-          data_source_tier:
-            | Database["public"]["Enums"]["data_source_tier"]
-            | null
-          data_source_type: Database["public"]["Enums"]["provider_type"]
           id: string
           name: string
-          package_price: number | null
-          skip_trace_rate: number | null
-          skip_trace_rate_tier:
-            | Database["public"]["Enums"]["skip_trace_rate_tier"]
-            | null
-          skip_tracing_type: Database["public"]["Enums"]["provider_type"]
         }
         Insert: {
-          assigned_csr_id?: string | null
           created_at?: string
-          data_source_tier?:
-            | Database["public"]["Enums"]["data_source_tier"]
-            | null
-          data_source_type: Database["public"]["Enums"]["provider_type"]
           id?: string
           name: string
-          package_price?: number | null
-          skip_trace_rate?: number | null
-          skip_trace_rate_tier?:
-            | Database["public"]["Enums"]["skip_trace_rate_tier"]
-            | null
-          skip_tracing_type: Database["public"]["Enums"]["provider_type"]
         }
         Update: {
-          assigned_csr_id?: string | null
           created_at?: string
-          data_source_tier?:
-            | Database["public"]["Enums"]["data_source_tier"]
-            | null
-          data_source_type?: Database["public"]["Enums"]["provider_type"]
           id?: string
           name?: string
-          package_price?: number | null
-          skip_trace_rate?: number | null
-          skip_trace_rate_tier?:
-            | Database["public"]["Enums"]["skip_trace_rate_tier"]
-            | null
-          skip_tracing_type?: Database["public"]["Enums"]["provider_type"]
+        }
+        Relationships: []
+      }
+      data_list_services: {
+        Row: {
+          campaign_service_id: string
+          data_list_id: string
+        }
+        Insert: {
+          campaign_service_id: string
+          data_list_id: string
+        }
+        Update: {
+          campaign_service_id?: string
+          data_list_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "companies_assigned_csr_id_fkey"
-            columns: ["assigned_csr_id"]
+            foreignKeyName: "data_list_services_campaign_service_id_fkey"
+            columns: ["campaign_service_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "campaign_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_list_services_data_list_id_fkey"
+            columns: ["data_list_id"]
+            isOneToOne: false
+            referencedRelation: "data_lists"
             referencedColumns: ["id"]
           },
         ]
       }
       data_lists: {
         Row: {
-          campaign_service_id: string
           created_at: string
           duplicates: number
           entered_by: string
@@ -169,7 +210,6 @@ export type Database = {
           skip_trace_rate: number
         }
         Insert: {
-          campaign_service_id: string
           created_at?: string
           duplicates: number
           entered_by: string
@@ -181,7 +221,6 @@ export type Database = {
           skip_trace_rate?: number
         }
         Update: {
-          campaign_service_id?: string
           created_at?: string
           duplicates?: number
           entered_by?: string
@@ -194,15 +233,104 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "data_lists_campaign_service_id_fkey"
-            columns: ["campaign_service_id"]
+            foreignKeyName: "data_lists_entered_by_fkey"
+            columns: ["entered_by"]
             isOneToOne: false
-            referencedRelation: "campaign_services"
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monthly_payment_confirmations: {
+        Row: {
+          client_id: string
+          confirmed_at: string
+          confirmed_by: string
+          created_at: string
+          id: string
+          month: string
+        }
+        Insert: {
+          client_id: string
+          confirmed_at?: string
+          confirmed_by: string
+          created_at?: string
+          id?: string
+          month: string
+        }
+        Update: {
+          client_id?: string
+          confirmed_at?: string
+          confirmed_by?: string
+          created_at?: string
+          id?: string
+          month?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_payment_confirmations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "data_lists_entered_by_fkey"
-            columns: ["entered_by"]
+            foreignKeyName: "monthly_payment_confirmations_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payg_requests: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          paid: boolean
+          paid_at: string | null
+          pull_rate: number
+          records_to_pull: number
+          records_to_skip_trace: number
+          skip_trace_rate: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          paid?: boolean
+          paid_at?: string | null
+          pull_rate?: number
+          records_to_pull: number
+          records_to_skip_trace?: number
+          skip_trace_rate?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          paid?: boolean
+          paid_at?: string | null
+          pull_rate?: number
+          records_to_pull?: number
+          records_to_skip_trace?: number
+          skip_trace_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payg_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payg_requests_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -324,6 +452,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      company_assigned_csr_id: {
+        Args: { p_company_id: string }
+        Returns: string
+      }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
@@ -333,7 +465,8 @@ export type Database = {
         Returns: {
           csr_id: string
           csr_name: string
-          data_commission: number
+          package_commission: number
+          payg_commission: number
           total_commission: number
           upsell_commission: number
         }[]
@@ -342,6 +475,7 @@ export type Database = {
     Enums: {
       campaign_type: "cold_calling" | "texting"
       data_source_tier: "package" | "payg" | "legacy"
+      package_tier: "starter" | "pro" | "growth"
       provider_type: "res" | "self_provided"
       rate_type: "standard" | "promo"
       skip_trace_rate_tier: "0.09" | "0.07" | "0.0525" | "custom"
@@ -483,6 +617,7 @@ export const Constants = {
     Enums: {
       campaign_type: ["cold_calling", "texting"],
       data_source_tier: ["package", "payg", "legacy"],
+      package_tier: ["starter", "pro", "growth"],
       provider_type: ["res", "self_provided"],
       rate_type: ["standard", "promo"],
       skip_trace_rate_tier: ["0.09", "0.07", "0.0525", "custom"],

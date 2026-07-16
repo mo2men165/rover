@@ -8,7 +8,7 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import { MonthPicker } from "@/components/commissions/month-picker";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -17,6 +17,21 @@ function formatCurrency(value: number) {
 function currentMonth() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthLabel(monthStr: string) {
+  const [year, m] = monthStr.split("-").map(Number);
+  return new Date(Date.UTC(year, m - 1, 1)).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function priorMonth(monthStr: string) {
+  const [year, m] = monthStr.split("-").map(Number);
+  const prior = new Date(Date.UTC(year, m - 2, 1));
+  return `${prior.getUTCFullYear()}-${String(prior.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 export default async function CommissionsPage({
@@ -56,21 +71,14 @@ export default async function CommissionsPage({
         <div>
           <h1 className="font-heading text-xl text-ink">Commissions</h1>
           <p className="text-sm text-ink-muted">
-            {isCsr ? "Your commission for" : "All CSRs' commission for"}{" "}
-            {month}
+            {isCsr ? "Your" : "All CSRs'"} {formatMonthLabel(month)} payout
+          </p>
+          <p className="text-xs text-ink-muted">
+            Package, PAYG, and upsell commission are earned in {formatMonthLabel(priorMonth(month))}{" "}
+            and paid out this month.
           </p>
         </div>
-        <form method="get" className="flex items-center gap-2">
-          <input
-            type="month"
-            name="month"
-            defaultValue={month}
-            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-          <Button type="submit" variant="outline">
-            View
-          </Button>
-        </form>
+        <MonthPicker value={month} />
       </div>
 
       {error && (
@@ -80,13 +88,21 @@ export default async function CommissionsPage({
       )}
 
       {isCsr ? (
-        <div className="grid max-w-lg grid-cols-3 gap-4">
+        <div className="grid max-w-2xl grid-cols-4 gap-4">
           <div className="border border-border bg-surface-raised p-4">
             <p className="text-xs uppercase tracking-wide text-ink-muted">
-              Data commission
+              Package commission
             </p>
             <p className="mt-1 font-heading text-xl tabular text-ink">
-              {formatCurrency(commissions[0]?.data_commission ?? 0)}
+              {formatCurrency(commissions[0]?.package_commission ?? 0)}
+            </p>
+          </div>
+          <div className="border border-border bg-surface-raised p-4">
+            <p className="text-xs uppercase tracking-wide text-ink-muted">
+              PAYG commission
+            </p>
+            <p className="mt-1 font-heading text-xl tabular text-ink">
+              {formatCurrency(commissions[0]?.payg_commission ?? 0)}
             </p>
           </div>
           <div className="border border-border bg-surface-raised p-4">
@@ -112,7 +128,8 @@ export default async function CommissionsPage({
             <TableHeader>
               <TableRow>
                 <TableHead>CSR</TableHead>
-                <TableHead className="text-right">Data</TableHead>
+                <TableHead className="text-right">Package</TableHead>
+                <TableHead className="text-right">PAYG</TableHead>
                 <TableHead className="text-right">Upsell</TableHead>
                 <TableHead className="text-right">Total</TableHead>
               </TableRow>
@@ -120,8 +137,8 @@ export default async function CommissionsPage({
             <TableBody>
               {commissions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-16 text-center text-sm text-ink-muted">
-                    No commission data for {month}.
+                  <TableCell colSpan={5} className="py-16 text-center text-sm text-ink-muted">
+                    No commission data for {formatMonthLabel(month)}.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -133,7 +150,10 @@ export default async function CommissionsPage({
                     >
                       <TableCell className="font-medium text-ink">{r.csr_name}</TableCell>
                       <TableCell className="text-right tabular">
-                        {formatCurrency(r.data_commission)}
+                        {formatCurrency(r.package_commission)}
+                      </TableCell>
+                      <TableCell className="text-right tabular">
+                        {formatCurrency(r.payg_commission)}
                       </TableCell>
                       <TableCell className="text-right tabular">
                         {formatCurrency(r.upsell_commission)}
@@ -145,6 +165,7 @@ export default async function CommissionsPage({
                   ))}
                   <TableRow className="border-t border-border">
                     <TableCell className="font-medium text-ink">Total</TableCell>
+                    <TableCell />
                     <TableCell />
                     <TableCell />
                     <TableCell className="text-right tabular font-medium text-ledger">

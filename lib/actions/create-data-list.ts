@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 
 type CreateDataListInput = {
-  campaignServiceId: string;
+  campaignServiceIds: string[];
   listDate: string;
   recordsCount: number;
   recordsAccepted: number;
@@ -40,19 +40,40 @@ export async function createDataList(
     return { success: false, error: "Only Admins can enter data lists." };
   }
 
-  const { error } = await supabase.from("data_lists").insert({
-    campaign_service_id: input.campaignServiceId,
-    list_date: input.listDate,
-    records_count: input.recordsCount,
-    records_accepted: input.recordsAccepted,
-    duplicates: input.duplicates,
-    records_skip_traced: input.recordsSkipTraced ?? null,
-    skip_trace_rate: input.skipTraceRate,
-    entered_by: user.id,
-  });
+  if (input.campaignServiceIds.length === 0) {
+    return { success: false, error: "Select at least one campaign service." };
+  }
 
-  if (error) {
-    return { success: false, error: error.message };
+  const { data: dataList, error: insertError } = await supabase
+    .from("data_lists")
+    .insert({
+      list_date: input.listDate,
+      records_count: input.recordsCount,
+      records_accepted: input.recordsAccepted,
+      duplicates: input.duplicates,
+      records_skip_traced: input.recordsSkipTraced ?? null,
+      skip_trace_rate: input.skipTraceRate,
+      entered_by: user.id,
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !dataList) {
+    return { success: false, error: insertError?.message ?? "Failed to create data list." };
+  }
+
+  const { error: servicesError } = await supabase.from("data_list_services").insert(
+    input.campaignServiceIds.map((campaignServiceId) => ({
+      data_list_id: dataList.id,
+      campaign_service_id: campaignServiceId,
+    }))
+  );
+
+  if (servicesError) {
+    // Data list row was created but its service links failed -- clean up
+    // rather than leave an orphaned, service-less data_lists row.
+    await supabase.from("data_lists").delete().eq("id", dataList.id);
+    return { success: false, error: servicesError.message };
   }
 
   return { success: true };

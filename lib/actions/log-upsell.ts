@@ -59,17 +59,18 @@ export async function logUpsell(input: LogUpsellInput): Promise<LogUpsellResult>
 
   const admin = createAdminClient();
 
-  // Ownership check: the acting CSR must be the one CSR assigned to
-  // this company (assigned_csr_id lives on companies, not per-campaign)
-  // — otherwise a crafted request could log an upsell (and its
-  // commission) against another CSR's client.
-  const { data: company } = await admin
-    .from("companies")
+  // Ownership check: the acting CSR must be the one CSR assigned to this
+  // company (assigned_csr_id lives on the POC client row as of Sprint 3,
+  // not companies) — otherwise a crafted request could log an upsell
+  // (and its commission) against another CSR's client.
+  const { data: pocClient } = await admin
+    .from("clients")
     .select("assigned_csr_id")
-    .eq("id", input.companyId)
-    .single();
+    .eq("company_id", input.companyId)
+    .eq("is_poc", true)
+    .maybeSingle();
 
-  if (!company || company.assigned_csr_id !== user.id) {
+  if (!pocClient || pocClient.assigned_csr_id !== user.id) {
     return { success: false, error: "You are not assigned to this client." };
   }
 

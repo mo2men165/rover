@@ -18,6 +18,20 @@ export const DATA_SOURCE_TIER_LABELS: Record<Enums["data_source_tier"], string> 
   legacy: "Legacy",
 };
 
+export const PACKAGE_TIER_LABELS: Record<Enums["package_tier"], string> = {
+  starter: "Starter",
+  pro: "Pro",
+  growth: "Growth",
+};
+
+// Fixed, non-editable price per package_tier — mirrors the DB trigger
+// (set_client_package_price) so the UI can preview price before submit.
+export const PACKAGE_TIER_PRICES: Record<Enums["package_tier"], number> = {
+  starter: 450,
+  pro: 1215,
+  growth: 6775,
+};
+
 export const SKIP_TRACE_RATE_TIER_LABELS: Record<Enums["skip_trace_rate_tier"], string> = {
   "0.09": "$0.09 / record",
   "0.07": "$0.07 / record",

@@ -34,7 +34,7 @@ export function DataListEntryWizard({
   const [step, setStep] = useState<"client" | "service" | "form">("client");
   const [query, setQuery] = useState("");
   const [selectedClient, setSelectedClient] = useState<ClientRow | null>(null);
-  const [selectedService, setSelectedService] = useState<CampaignServiceRow | null>(null);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,9 +56,20 @@ export function DataListEntryWizard({
     return campaignServices.filter((cs) => cs.company_id === selectedClient.company_id);
   }, [campaignServices, selectedClient]);
 
+  const selectedServices = useMemo(
+    () => servicesForCompany.filter((cs) => selectedServiceIds.includes(cs.id)),
+    [servicesForCompany, selectedServiceIds]
+  );
+
+  function toggleService(id: string) {
+    setSelectedServiceIds((prev) =>
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
+    );
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedService) return;
+    if (selectedServiceIds.length === 0) return;
 
     const accepted = Number(recordsAccepted);
     const skipTraced = recordsSkipTraced ? Number(recordsSkipTraced) : undefined;
@@ -70,7 +81,7 @@ export function DataListEntryWizard({
     setSubmitting(true);
     setError(null);
     const result = await createDataList({
-      campaignServiceId: selectedService.id,
+      campaignServiceIds: selectedServiceIds,
       listDate,
       recordsCount: Number(recordsCount),
       recordsAccepted: accepted,
@@ -112,7 +123,7 @@ export function DataListEntryWizard({
                 type="button"
                 onClick={() => {
                   setSelectedClient(c);
-                  setSelectedService(null);
+                  setSelectedServiceIds([]);
                   setStep("service");
                 }}
                 className="flex w-full items-center px-3 py-2 text-left text-sm text-ink hover:bg-surface-sunken"
@@ -132,7 +143,7 @@ export function DataListEntryWizard({
         <div>
           <h1 className="font-heading text-xl text-ink">New data list</h1>
           <p className="text-sm text-ink-muted">
-            Choose {selectedClient?.name}&apos;s campaign service.
+            Select one or more of {selectedClient?.name}&apos;s campaign services this list covers.
           </p>
         </div>
         <div className="border border-border bg-surface-raised">
@@ -141,24 +152,35 @@ export function DataListEntryWizard({
               This client has no campaign services yet.
             </p>
           ) : (
-            servicesForCompany.map((cs) => (
-              <button
-                key={cs.id}
-                type="button"
-                onClick={() => {
-                  setSelectedService(cs);
-                  setStep("form");
-                }}
-                className="flex w-full items-center px-3 py-2 text-left text-sm text-ink hover:bg-surface-sunken"
-              >
-                {campaignServiceLabel(cs, selectedClient!.name)}
-              </button>
-            ))
+            servicesForCompany.map((cs) => {
+              const checked = selectedServiceIds.includes(cs.id);
+              return (
+                <button
+                  key={cs.id}
+                  type="button"
+                  onClick={() => toggleService(cs.id)}
+                  aria-pressed={checked}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink hover:bg-surface-sunken"
+                >
+                  <input type="checkbox" checked={checked} readOnly className="pointer-events-none" />
+                  {campaignServiceLabel(cs, selectedClient!.name)}
+                </button>
+              );
+            })
           )}
         </div>
-        <Button type="button" variant="outline" onClick={() => setStep("client")}>
-          Back
-        </Button>
+        <div className="flex gap-3">
+          <Button type="button" variant="outline" onClick={() => setStep("client")}>
+            Back
+          </Button>
+          <Button
+            type="button"
+            disabled={selectedServiceIds.length === 0}
+            onClick={() => setStep("form")}
+          >
+            Continue
+          </Button>
+        </div>
       </div>
     );
   }
@@ -169,7 +191,9 @@ export function DataListEntryWizard({
         <h1 className="font-heading text-xl text-ink">New data list</h1>
         <p className="text-sm text-ink-muted">
           {selectedClient?.name} —{" "}
-          {selectedService && campaignServiceLabel(selectedService, selectedClient!.name)}
+          {selectedServices
+            .map((cs) => campaignServiceLabel(cs, selectedClient!.name))
+            .join(", ")}
         </p>
       </div>
 
