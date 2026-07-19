@@ -89,7 +89,7 @@ export function LogUpsellForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 border border-border bg-surface-raised p-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 glass-panel rounded-[var(--radius-lg)] p-4">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="upsell-type">Upsell</Label>
         <select

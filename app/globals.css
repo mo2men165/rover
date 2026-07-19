@@ -39,71 +39,110 @@
   --color-paper: var(--paper);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
   --color-ledger: var(--ledger);
   --color-clay: var(--clay);
   --color-sage: var(--sage);
   --color-rust: var(--rust);
   --color-surface-sunken: var(--surface-sunken);
 
-  /* dark metallic additions */
+  /* liquid-glass additions */
   --color-void: var(--void);
   --color-surface: var(--surface);
+  --color-brand-blue: var(--brand-blue);
+  --color-accent-violet: var(--accent-violet);
+  --color-accent-emerald: var(--accent-emerald);
+  --color-accent-amber: var(--accent-amber);
+  --color-accent-coral: var(--accent-coral);
 
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 20px;
 }
 
 :root {
-  /* ROVER primitives — dark metallic. Brand blue sampled from
-     public/Logo - Color.png (#30A9DF). */
-  --void: #080b12;
-  --surface: #0f141e;
-  --surface-raised-start: #161d2c;
-  --surface-raised-end: #1e2740;
-  --surface-sunken: #131a27;
+  /* ROVER primitives — matched to the Claude Design mockups
+     (claude.ai/design/p/12275f9c-3bb6-4229-85a7-b2eaa4fc4d74). Every
+     oklch value below is copied verbatim from Rover-Components.dc.html's
+     "Color Tokens" section, so component classNames repaint against the
+     mockups without a rename pass. */
+  --void: oklch(13% 0.013 262);
+  --surface: oklch(15% 0.014 262);
+  --surface-card: oklch(18% 0.014 262);
+  --surface-card-raised: oklch(22% 0.016 262);
+  --surface-sunken: oklch(10% 0.012 262);
+  --surface-raised-start: oklch(20% 0.015 262);
+  --surface-raised-end: oklch(24% 0.017 262);
   --paper: var(--void);
-  --ink: #edf1f5;
-  --ink-muted: #7c93a8;
-  --ledger: #30a9df;
-  --brand-blue: #30a9df;
-  --brand-blue-deep: #1b6e96;
-  --clay: #c98a3f;
-  --sage: #33c481;
-  --rust: #e5484d;
+
+  --ink: oklch(97% 0.004 260);
+  --ink-muted: oklch(75% 0.02 258);
+  --ink-faint: oklch(58% 0.02 258);
+
+  --brand-blue: oklch(74% 0.15 224);
+  --brand-blue-deep: oklch(46% 0.15 260);
+  --brand-blue-glow: oklch(74% 0.15 224 / 0.35);
+  --ledger: var(--brand-blue);
+  /* exact primary-button gradient stops, copied verbatim from every
+     mockup's "Primary Action" button (distinct from the electric/deep
+     tokens above, which are used for glows, icons, and active nav). */
+  --brand-button-start: oklch(52% 0.15 258);
+  --brand-button-end: oklch(44% 0.15 262);
+
+  --accent-violet: oklch(58% 0.14 270);
+  --accent-violet-deep: oklch(46% 0.15 260);
+  --accent-emerald: oklch(74% 0.16 152);
+  --accent-emerald-deep: oklch(58% 0.15 152);
+  --accent-amber: oklch(78% 0.15 85);
+  --accent-amber-deep: oklch(62% 0.14 85);
+  --accent-coral: oklch(64% 0.19 25);
+  --accent-coral-deep: oklch(52% 0.17 25);
+
+  /* legacy aliases kept so existing text-ledger/text-clay/etc. call
+     sites repaint automatically without a rename pass */
+  --clay: var(--accent-amber);
+  --sage: var(--accent-emerald);
+  --rust: var(--accent-coral);
+
   --metallic-edge: #2b3a52;
   --chrome-a: #e4e7ec;
   --chrome-b: #9aa1ac;
   --chrome-c: #c7ccd3;
 
+  --glass-bg: rgba(255, 255, 255, 0.045);
+  --glass-bg-raised: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-border-strong: rgba(255, 255, 255, 0.35);
+  --glass-blur: 24px;
+
   /* shadcn semantic mapping */
   --background: var(--void);
   --foreground: var(--ink);
-  --card: var(--surface-raised-start);
+  --card: var(--glass-bg);
   --card-foreground: var(--ink);
-  --popover: var(--surface-raised-start);
+  --popover: oklch(18% 0.014 262 / 0.92);
   --popover-foreground: var(--ink);
   --primary: var(--brand-blue);
-  --primary-foreground: #05141d;
-  --secondary: var(--surface-sunken);
+  --primary-foreground: oklch(12% 0.01 262);
+  --secondary: var(--surface-card);
   --secondary-foreground: var(--ink);
   --muted: var(--surface-sunken);
   --muted-foreground: var(--ink-muted);
-  --accent: var(--clay);
-  --accent-foreground: #1a1206;
-  --destructive: var(--rust);
-  --border: rgba(48, 169, 223, 0.16);
-  --input: rgba(48, 169, 223, 0.22);
+  --accent: oklch(74% 0.15 224 / 0.12);
+  --accent-foreground: var(--ink);
+  --destructive: var(--accent-coral);
+  --border: var(--glass-border);
+  --input: oklch(74% 0.15 224 / 0.22);
   --ring: var(--brand-blue);
-  --radius: 0.625rem;
-  --sidebar: var(--surface);
+  --radius: 0.75rem;
+  --sidebar: rgba(255, 255, 255, 0.03);
   --sidebar-foreground: var(--ink);
   --sidebar-primary: var(--brand-blue);
-  --sidebar-primary-foreground: #05141d;
-  --sidebar-accent: var(--surface-sunken);
+  --sidebar-primary-foreground: oklch(12% 0.01 262);
+  --sidebar-accent: oklch(74% 0.15 224 / 0.14);
   --sidebar-accent-foreground: var(--ink);
-  --sidebar-border: rgba(48, 169, 223, 0.16);
+  --sidebar-border: var(--glass-border);
   --sidebar-ring: var(--brand-blue);
 }
 
@@ -160,8 +199,23 @@
 
   .glow-blue {
     box-shadow:
-      0 0 0 1px rgba(48, 169, 223, 0.3),
-      0 0 20px 0 rgba(48, 169, 223, 0.35);
+      0 0 0 1px rgba(56, 182, 240, 0.3),
+      0 0 20px 0 rgba(56, 182, 240, 0.35);
+  }
+  .glow-violet {
+    box-shadow:
+      0 0 0 1px rgba(155, 135, 245, 0.3),
+      0 0 20px 0 rgba(155, 135, 245, 0.35);
+  }
+  .glow-emerald {
+    box-shadow:
+      0 0 0 1px rgba(52, 211, 153, 0.3),
+      0 0 20px 0 rgba(52, 211, 153, 0.35);
+  }
+  .glow-amber {
+    box-shadow:
+      0 0 0 1px rgba(245, 185, 66, 0.3),
+      0 0 20px 0 rgba(245, 185, 66, 0.35);
   }
 
   .shine-mask {
@@ -182,10 +236,141 @@
     transform: translateX(-120%);
     will-change: transform;
   }
+
+  /* Page content shell — matches Rover-*.dc.html main column padding
+     (32px 40px 60px). Profile / Interaction Log use the modifiers. */
+  .page-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding: 32px 40px 60px;
+    min-height: 100%;
+    box-sizing: border-box;
+  }
+  .page-shell--profile {
+    gap: 16px;
+    padding: 28px 40px 60px;
+  }
+  .page-shell--interactions {
+    padding: 32px 40px 90px;
+  }
+  .page-shell--wizard {
+    gap: 0;
+    padding: 0;
+    min-height: 100%;
+  }
+
+  /* Liquid glass — base mechanic from Rover-Components.dc.html:
+     rgba(255,255,255,.045) bg, 1px rgba(255,255,255,.09) border,
+     blur(24px) saturate(160%), soft depth shadow. */
+  .glass-panel {
+    position: relative;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      inset 0 1px 0 0 var(--glass-border-strong),
+      0 12px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  .glass-panel--blue {
+    border-color: oklch(74% 0.15 224 / 0.28);
+    box-shadow:
+      inset 0 1px 0 0 var(--glass-border-strong),
+      0 0 0 1px oklch(74% 0.15 224 / 0.12),
+      0 16px 40px -16px oklch(74% 0.15 224 / 0.25),
+      0 12px 32px -12px rgba(0, 0, 0, 0.55);
+  }
+  .glass-panel--violet {
+    border-color: oklch(58% 0.14 270 / 0.28);
+    box-shadow:
+      inset 0 1px 0 0 var(--glass-border-strong),
+      0 0 0 1px oklch(58% 0.14 270 / 0.12),
+      0 16px 40px -16px oklch(58% 0.14 270 / 0.25),
+      0 12px 32px -12px rgba(0, 0, 0, 0.55);
+  }
+  .glass-panel--emerald {
+    border-color: oklch(74% 0.16 152 / 0.28);
+    box-shadow:
+      inset 0 1px 0 0 var(--glass-border-strong),
+      0 0 0 1px oklch(74% 0.16 152 / 0.12),
+      0 16px 40px -16px oklch(74% 0.16 152 / 0.25),
+      0 12px 32px -12px rgba(0, 0, 0, 0.55);
+  }
+  .glass-panel--amber {
+    border-color: oklch(78% 0.15 85 / 0.28);
+    box-shadow:
+      inset 0 1px 0 0 var(--glass-border-strong),
+      0 0 0 1px oklch(78% 0.15 85 / 0.12),
+      0 16px 40px -16px oklch(78% 0.15 85 / 0.25),
+      0 12px 32px -12px rgba(0, 0, 0, 0.55);
+  }
+
+  /* Ambient background — flat near-black void plus two slowly-floating
+     blurred orbs, reproduced from every Rover-*.dc.html mockup verbatim
+     (rv-float1/rv-float2 keyframes + orb placement/size/color). */
+  .gradient-mesh {
+    background-color: var(--void);
+  }
+
+  @keyframes rv-float1 {
+    0%,
+    100% {
+      transform: translate(0, 0) scale(1);
+    }
+    50% {
+      transform: translate(40px, -30px) scale(1.1);
+    }
+  }
+  @keyframes rv-float2 {
+    0%,
+    100% {
+      transform: translate(0, 0) scale(1);
+    }
+    50% {
+      transform: translate(-30px, 25px) scale(1.06);
+    }
+  }
+
+  .ambient-orb-1 {
+    position: fixed;
+    top: -10%;
+    left: 5%;
+    width: 520px;
+    height: 520px;
+    border-radius: 50%;
+    background: oklch(46% 0.15 260 / 0.22);
+    filter: blur(90px);
+    animation: rv-float1 16s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .ambient-orb-2 {
+    position: fixed;
+    top: 20%;
+    right: -5%;
+    width: 460px;
+    height: 460px;
+    border-radius: 50%;
+    background: oklch(74% 0.15 224 / 0.14);
+    filter: blur(100px);
+    animation: rv-float2 18s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .shine-layer {
     display: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -8,7 +8,20 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
+import { StatTile } from "@/components/ui/stat-tile";
 import { MonthPicker } from "@/components/commissions/month-picker";
+import { UPSELL_TYPE_LABELS } from "@/lib/supabase/labels";
+import type { Database } from "@/lib/supabase/database.types";
+
+type UpsellType = Database["public"]["Enums"]["upsell_type"];
+
+type LineItem = {
+  id: string;
+  client: string;
+  type: "Package" | "PAYG" | "Upsell";
+  typeDetail?: string;
+  amount: number;
+};
 
 function formatCurrency(value: number) {
   return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -34,6 +47,102 @@ function priorMonth(monthStr: string) {
   return `${prior.getUTCFullYear()}-${String(prior.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+function initialsOf(name: string) {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase();
+}
+
+function companyLabel(
+  client:
+    | { name: string; company?: { name: string } | null }
+    | null
+    | undefined
+) {
+  return client?.company?.name ?? client?.name ?? "Unknown client";
+}
+
+async function fetchCsrLineItems(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  csrId: string,
+  activityStart: string,
+  activityEnd: string
+): Promise<LineItem[]> {
+  const [pkgRes, paygRes, upsellRes] = await Promise.all([
+    supabase
+      .from("monthly_payment_confirmations")
+      .select(
+        "id, confirmed_at, client:clients!inner(id, name, package_price, assigned_csr_id, company:companies(name))"
+      )
+      .eq("clients.assigned_csr_id", csrId)
+      .gte("confirmed_at", activityStart)
+      .lt("confirmed_at", activityEnd),
+    supabase
+      .from("payg_requests")
+      .select(
+        "id, paid_at, records_to_pull, pull_rate, records_to_skip_trace, skip_trace_rate, client:clients(name, company:companies(name))"
+      )
+      .eq("created_by", csrId)
+      .eq("paid", true)
+      .gte("paid_at", activityStart)
+      .lt("paid_at", activityEnd),
+    supabase
+      .from("upsells")
+      .select("id, upsell_type, total_amount, created_at, company:companies(name)")
+      .eq("csr_id", csrId)
+      .gte("created_at", activityStart)
+      .lt("created_at", activityEnd),
+  ]);
+
+  const items: LineItem[] = [];
+
+  for (const row of pkgRes.data ?? []) {
+    const client = row.client as {
+      name: string;
+      package_price: number | null;
+      company?: { name: string } | null;
+    } | null;
+    items.push({
+      id: `pkg-${row.id}`,
+      client: companyLabel(client),
+      type: "Package",
+      amount: 0.02 * Number(client?.package_price ?? 0),
+    });
+  }
+
+  for (const row of paygRes.data ?? []) {
+    const client = row.client as {
+      name: string;
+      company?: { name: string } | null;
+    } | null;
+    const amount =
+      0.02 * Number(row.records_to_pull) * Number(row.pull_rate) +
+      0.03 * Number(row.records_to_skip_trace) * Number(row.skip_trace_rate);
+    items.push({
+      id: `payg-${row.id}`,
+      client: companyLabel(client),
+      type: "PAYG",
+      amount,
+    });
+  }
+
+  for (const row of upsellRes.data ?? []) {
+    const company = row.company as { name: string } | null;
+    const upsellType = row.upsell_type as UpsellType;
+    items.push({
+      id: `upsell-${row.id}`,
+      client: company?.name ?? "Unknown client",
+      type: "Upsell",
+      typeDetail: UPSELL_TYPE_LABELS[upsellType] ?? upsellType,
+      amount: Number(row.total_amount),
+    });
+  }
+
+  items.sort((a, b) => b.amount - a.amount);
+  return items;
+}
+
 export default async function CommissionsPage({
   searchParams,
 }: {
@@ -41,6 +150,9 @@ export default async function CommissionsPage({
 }) {
   const { month: monthParam } = await searchParams;
   const month = monthParam || currentMonth();
+  const activityMonth = priorMonth(month);
+  const activityStart = `${activityMonth}-01T00:00:00.000Z`;
+  const activityEnd = `${month}-01T00:00:00.000Z`;
 
   const supabase = await createClient();
   const {
@@ -63,21 +175,31 @@ export default async function CommissionsPage({
 
   const isCsr = callerProfile.role === "csr";
   const commissions = rows ?? [];
-  const totalAll = commissions.reduce((sum, r) => sum + r.total_commission, 0);
+  const myCommission =
+    commissions.find((r) => r.csr_id === user?.id) ?? commissions[0] ?? null;
+  const totalAll = commissions.reduce((sum, r) => sum + Number(r.total_commission), 0);
+
+  const lineItems =
+    isCsr && user
+      ? await fetchCsrLineItems(supabase, user.id, activityStart, activityEnd)
+      : [];
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+    <div className="page-shell">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-xl text-ink">Commissions</h1>
+          <h1 className="font-heading text-[26px] font-bold tracking-[-0.02em] text-ink">
+            Commissions
+          </h1>
           <p className="text-sm text-ink-muted">
             {isCsr ? "Your" : "All CSRs'"} {formatMonthLabel(month)} payout
           </p>
           <p className="text-xs text-ink-muted">
-            Package, PAYG, and upsell commission are earned in {formatMonthLabel(priorMonth(month))}{" "}
-            and paid out this month.
+            Commission earned in {formatMonthLabel(activityMonth)} is paid in{" "}
+            {formatMonthLabel(month)} — pick the payout month, not the earning month.
           </p>
         </div>
+
         <MonthPicker value={month} />
       </div>
 
@@ -88,95 +210,159 @@ export default async function CommissionsPage({
       )}
 
       {isCsr ? (
-        <div className="grid max-w-2xl grid-cols-4 gap-4">
-          <div className="border border-border bg-surface-raised p-4">
-            <p className="text-xs uppercase tracking-wide text-ink-muted">
-              Package commission
-            </p>
-            <p className="mt-1 font-heading text-xl tabular text-ink">
-              {formatCurrency(commissions[0]?.package_commission ?? 0)}
-            </p>
+        <>
+          <div className="grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-4">
+            <StatTile
+              label="Package Commission"
+              value={Number(myCommission?.package_commission ?? 0)}
+              prefix="$"
+              decimals={2}
+              accent="emerald"
+            />
+            <StatTile
+              label="PAYG Commission"
+              value={Number(myCommission?.payg_commission ?? 0)}
+              prefix="$"
+              decimals={2}
+              accent="emerald"
+            />
+            <StatTile
+              label="Upsell Commission"
+              value={Number(myCommission?.upsell_commission ?? 0)}
+              prefix="$"
+              decimals={2}
+              accent="emerald"
+            />
+            <StatTile
+              label="Total Payout"
+              value={Number(myCommission?.total_commission ?? 0)}
+              prefix="$"
+              decimals={2}
+              accent="blue"
+            />
           </div>
-          <div className="border border-border bg-surface-raised p-4">
-            <p className="text-xs uppercase tracking-wide text-ink-muted">
-              PAYG commission
-            </p>
-            <p className="mt-1 font-heading text-xl tabular text-ink">
-              {formatCurrency(commissions[0]?.payg_commission ?? 0)}
-            </p>
-          </div>
-          <div className="border border-border bg-surface-raised p-4">
-            <p className="text-xs uppercase tracking-wide text-ink-muted">
-              Upsell commission
-            </p>
-            <p className="mt-1 font-heading text-xl tabular text-ink">
-              {formatCurrency(commissions[0]?.upsell_commission ?? 0)}
-            </p>
-          </div>
-          <div className="border border-ledger bg-surface-raised p-4">
-            <p className="text-xs uppercase tracking-wide text-ink-muted">
-              Total
-            </p>
-            <p className="mt-1 font-heading text-xl tabular text-ledger">
-              {formatCurrency(commissions[0]?.total_commission ?? 0)}
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="border border-border bg-surface-raised">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>CSR</TableHead>
-                <TableHead className="text-right">Package</TableHead>
-                <TableHead className="text-right">PAYG</TableHead>
-                <TableHead className="text-right">Upsell</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {commissions.length === 0 ? (
+
+          <div className="glass-panel overflow-hidden rounded-[var(--radius-lg)]">
+            <div className="border-b border-white/[0.07] px-5 py-3">
+              <h2 className="font-heading text-sm font-semibold text-ink">
+                Earned in {formatMonthLabel(activityMonth)}
+              </h2>
+              <p className="text-xs text-ink-muted">Line-item breakdown for this payout</p>
+            </div>
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="py-16 text-center text-sm text-ink-muted">
-                    No commission data for {formatMonthLabel(month)}.
-                  </TableCell>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
                 </TableRow>
-              ) : (
-                <>
-                  {commissions.map((r, i) => (
-                    <TableRow
-                      key={r.csr_id}
-                      className={i % 2 === 1 ? "bg-surface-sunken/50" : undefined}
-                    >
-                      <TableCell className="font-medium text-ink">{r.csr_name}</TableCell>
-                      <TableCell className="text-right tabular">
-                        {formatCurrency(r.package_commission)}
-                      </TableCell>
-                      <TableCell className="text-right tabular">
-                        {formatCurrency(r.payg_commission)}
-                      </TableCell>
-                      <TableCell className="text-right tabular">
-                        {formatCurrency(r.upsell_commission)}
-                      </TableCell>
-                      <TableCell className="text-right tabular font-medium text-ledger">
-                        {formatCurrency(r.total_commission)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow className="border-t border-border">
-                    <TableCell className="font-medium text-ink">Total</TableCell>
-                    <TableCell />
-                    <TableCell />
-                    <TableCell />
-                    <TableCell className="text-right tabular font-medium text-ledger">
-                      {formatCurrency(totalAll)}
+              </TableHeader>
+              <TableBody>
+                {lineItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="py-16 text-center text-sm text-ink-muted">
+                      No commission line items earned in {formatMonthLabel(activityMonth)}.
                     </TableCell>
                   </TableRow>
-                </>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : (
+                  lineItems.map((item, i) => (
+                    <TableRow
+                      key={item.id}
+                      className={i % 2 === 1 ? "bg-surface-sunken/50" : undefined}
+                    >
+                      <TableCell className="font-medium text-ink">{item.client}</TableCell>
+                      <TableCell className="text-ink-muted">
+                        {item.type}
+                        {item.typeDetail ? (
+                          <span className="text-ink-faint"> · {item.typeDetail}</span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right tabular font-medium text-ledger">
+                        {formatCurrency(item.amount)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="glass-panel glass-panel--blue max-w-md rounded-[var(--radius-lg)] bg-[linear-gradient(135deg,oklch(74%_0.15_224/0.16),oklch(46%_0.15_260/0.1))] p-6">
+            <p className="text-xs font-medium tracking-[0.08em] text-ink-muted uppercase">
+              Department Grand Total
+            </p>
+            <p className="mt-2 font-heading text-4xl font-bold tabular text-ledger">
+              {formatCurrency(totalAll)}
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">
+              {formatMonthLabel(month)} payout across all CSRs
+            </p>
+          </div>
+
+          <div className="glass-panel rounded-[var(--radius-lg)]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>CSR</TableHead>
+                  <TableHead className="text-right">Package</TableHead>
+                  <TableHead className="text-right">PAYG</TableHead>
+                  <TableHead className="text-right">Upsell</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {commissions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-16 text-center text-sm text-ink-muted">
+                      No commission data for {formatMonthLabel(month)}.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <>
+                    {commissions.map((r, i) => (
+                      <TableRow
+                        key={r.csr_id}
+                        className={i % 2 === 1 ? "bg-surface-sunken/50" : undefined}
+                      >
+                        <TableCell>
+                          <span className="flex items-center gap-2.5">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--brand-blue),var(--brand-blue-deep))] text-[10px] font-semibold text-white">
+                              {initialsOf(r.csr_name)}
+                            </span>
+                            <span className="font-medium text-ink">{r.csr_name}</span>
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right tabular">
+                          {formatCurrency(Number(r.package_commission))}
+                        </TableCell>
+                        <TableCell className="text-right tabular">
+                          {formatCurrency(Number(r.payg_commission))}
+                        </TableCell>
+                        <TableCell className="text-right tabular">
+                          {formatCurrency(Number(r.upsell_commission))}
+                        </TableCell>
+                        <TableCell className="text-right tabular font-medium text-ledger">
+                          {formatCurrency(Number(r.total_commission))}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="border-t border-border">
+                      <TableCell className="font-medium text-ink">Total</TableCell>
+                      <TableCell />
+                      <TableCell />
+                      <TableCell />
+                      <TableCell className="text-right tabular font-medium text-ledger">
+                        {formatCurrency(totalAll)}
+                      </TableCell>
+                    </TableRow>
+                  </>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
     </div>
   );

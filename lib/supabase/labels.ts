@@ -50,6 +50,17 @@ export const TEXTING_TIER_LABELS: Record<Enums["texting_tier"], string> = {
   "100k": "100k",
 };
 
+export const CLIENT_SCRIPT_LABELS: Record<Enums["client_script"], string> = {
+  four_pillars: "Four Pillars",
+  motivation_only: "Motivation Only",
+};
+
+export const CONTACT_METHOD_LABELS: Record<Enums["contact_method"], string> = {
+  email: "Email",
+  phone: "Phone",
+  text: "Text",
+};
+
 export const UPSELL_TYPE_LABELS: Record<Enums["upsell_type"], string> = {
   add_cc_seat: "Add CC Seat",
   add_texting_service: "Add Texting Service",

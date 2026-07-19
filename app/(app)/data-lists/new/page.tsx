@@ -26,9 +26,11 @@ export default async function NewDataListPage() {
   ]);
 
   return (
-    <DataListEntryWizard
-      clients={clients ?? []}
-      campaignServices={campaignServices ?? []}
-    />
+    <div className="page-shell">
+      <DataListEntryWizard
+        clients={clients ?? []}
+        campaignServices={campaignServices ?? []}
+      />
+    </div>
   );
 }

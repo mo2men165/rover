@@ -31,7 +31,7 @@ export function PaymentConfirmationChecklist({ clients }: { clients: ChecklistCl
   }
 
   return (
-    <div className="mb-6 border border-clay/40 bg-clay/5 p-4">
+    <div className="glass-panel glass-panel--amber rounded-[18px] p-5">
       <p className="text-sm font-medium text-ink">
         {clients.length} package client{clients.length === 1 ? "" : "s"} need this month&apos;s payment
         confirmed
@@ -43,7 +43,7 @@ export function PaymentConfirmationChecklist({ clients }: { clients: ChecklistCl
         {clients.map((c) => (
           <li
             key={c.id}
-            className="flex items-center justify-between gap-4 border border-border bg-surface-raised px-3 py-2"
+            className="flex items-center justify-between gap-4 rounded-[12px] border border-white/[0.08] bg-white/[0.03] px-3 py-2"
           >
             <span className="text-sm text-ink">{c.company?.name ?? c.name}</span>
             <Button

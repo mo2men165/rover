@@ -41,8 +41,8 @@ function yearOptions() {
   return Array.from({ length: 6 }, (_, i) => currentYear - 5 + i);
 }
 
-const menuTriggerClass =
-  "inline-flex h-9 min-w-0 cursor-pointer items-center justify-between gap-2 rounded-lg border-metallic px-3 text-sm text-ink transition-colors hover:text-ledger";
+const segmentTriggerClass =
+  "inline-flex h-7 min-w-20 cursor-pointer items-center justify-center gap-1 rounded-[8px] px-2 text-[13px] font-semibold text-ink transition-colors hover:bg-white/[0.06] hover:text-ledger";
 
 export function MonthPicker({ value }: { value: string }) {
   const router = useRouter();
@@ -55,12 +55,15 @@ export function MonthPicker({ value }: { value: string }) {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div
+      className="inline-flex items-center gap-2 rounded-[10px] border border-white/10 bg-white/[0.05] p-1.5"
+      aria-label="Month navigator"
+    >
       <Button
         type="button"
-        variant="outline"
-        size="icon"
-        className="size-9 shrink-0"
+        variant="ghost"
+        size="icon-sm"
+        className="size-7 shrink-0 rounded-[8px]"
         aria-label="Previous month"
         onClick={() => navigate(shiftMonth(value, -1))}
       >
@@ -68,11 +71,10 @@ export function MonthPicker({ value }: { value: string }) {
       </Button>
 
       <DropdownMenu>
-        <DropdownMenuTrigger className={`${menuTriggerClass} min-w-[8.75rem]`}>
+        <DropdownMenuTrigger className={segmentTriggerClass}>
           <span>{MONTHS[month - 1]}</span>
-          <ChevronDown className="size-3.5 shrink-0 text-ink-muted" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto">
+        <DropdownMenuContent align="center" className="max-h-64 min-w-32 overflow-y-auto">
           {MONTHS.map((label, index) => (
             <DropdownMenuItem
               key={label}
@@ -85,12 +87,14 @@ export function MonthPicker({ value }: { value: string }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <span className="text-sm text-ink-muted">·</span>
+
       <DropdownMenu>
-        <DropdownMenuTrigger className={`${menuTriggerClass} min-w-[5.5rem]`}>
+        <DropdownMenuTrigger className={cn(segmentTriggerClass, "min-w-12 gap-1")}>
           <span className="tabular">{year}</span>
-          <ChevronDown className="size-3.5 shrink-0 text-ink-muted" />
+          <ChevronDown className="size-3 shrink-0 text-ink-muted" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="center" className="min-w-20">
           {yearOptions().map((y) => (
             <DropdownMenuItem
               key={y}
@@ -105,9 +109,9 @@ export function MonthPicker({ value }: { value: string }) {
 
       <Button
         type="button"
-        variant="outline"
-        size="icon"
-        className="size-9 shrink-0"
+        variant="ghost"
+        size="icon-sm"
+        className="size-7 shrink-0 rounded-[8px]"
         aria-label="Next month"
         onClick={() => navigate(shiftMonth(value, 1))}
       >

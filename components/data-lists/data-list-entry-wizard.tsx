@@ -113,7 +113,7 @@ export function DataListEntryWizard({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <div className="border border-border bg-surface-raised">
+        <div className="glass-panel glass-panel--violet rounded-[var(--radius-lg)]">
           {filteredClients.length === 0 ? (
             <p className="p-4 text-sm text-ink-muted">No matching clients.</p>
           ) : (
@@ -146,7 +146,7 @@ export function DataListEntryWizard({
             Select one or more of {selectedClient?.name}&apos;s campaign services this list covers.
           </p>
         </div>
-        <div className="border border-border bg-surface-raised">
+        <div className="glass-panel glass-panel--violet rounded-[var(--radius-lg)]">
           {servicesForCompany.length === 0 ? (
             <p className="p-4 text-sm text-ink-muted">
               This client has no campaign services yet.

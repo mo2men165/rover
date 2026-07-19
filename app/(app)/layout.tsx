@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { RoleProvider } from "@/components/app-shell/role-context";
 import { Sidebar } from "@/components/app-shell/sidebar";
-import { Topbar } from "@/components/app-shell/topbar";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({
@@ -30,12 +29,11 @@ export default async function AppLayout({
 
   return (
     <RoleProvider initialRole={profile.role}>
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <div className="flex flex-1 flex-col">
-          <Topbar userName={profile.name} />
-          <main className="flex-1 bg-paper p-6">{children}</main>
-        </div>
+      <div className="gradient-mesh relative flex min-h-screen overflow-hidden">
+        <div aria-hidden className="ambient-orb-1" />
+        <div aria-hidden className="ambient-orb-2" />
+        <Sidebar userName={profile.name} />
+        <main className="relative z-[1] min-w-0 flex-1">{children}</main>
       </div>
     </RoleProvider>
   );

@@ -57,7 +57,7 @@ function NewPaygRequestForm({ clientId, onDone }: { clientId: string; onDone: ()
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 border border-border bg-surface-raised p-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 glass-panel glass-panel--amber rounded-[var(--radius-lg)] p-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="records-to-pull">Records to pull</Label>
@@ -179,11 +179,11 @@ export function PaygRequestsPanel({
       )}
 
       {requests.length === 0 ? (
-        <p className="border border-dashed border-border bg-surface-raised p-4 text-sm text-ink-muted">
+        <p className="glass-panel glass-panel--amber border-dashed border-white/15 rounded-[var(--radius-lg)] p-4 text-sm text-ink-muted">
           No PAYG requests yet.
         </p>
       ) : (
-        <div className="border border-border bg-surface-raised">
+        <div className="glass-panel glass-panel--amber rounded-[var(--radius-lg)]">
           <ul>
             {requests.map((r, i) => (
               <li

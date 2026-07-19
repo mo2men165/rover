@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import {
   Table,
   TableHeader,
@@ -19,6 +20,12 @@ import {
 import { LogUpsellToggle } from "@/components/upsells/log-upsell-toggle";
 import { PaygRequestsPanel } from "@/components/payg/payg-requests-panel";
 import { AddToDataPackageToggle } from "@/components/clients/add-to-data-package-toggle";
+import { ClientHeader } from "@/components/clients/client-header";
+import { BuyBoxCard } from "@/components/clients/buy-box-card";
+import { ScriptCard } from "@/components/clients/script-card";
+import { PinnedNotesCard } from "@/components/clients/pinned-notes-card";
+import { AssociatesCard } from "@/components/clients/associates-card";
+import { toBuyBox } from "@/lib/supabase/buy-box-options";
 import type { Database } from "@/lib/supabase/database.types";
 
 function formatPrice(value: number | null) {
@@ -32,15 +39,173 @@ function TypeIndicator({ type }: { type: CampaignType }) {
   const isCold = type === "cold_calling";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-sm ${isCold ? "text-ledger" : "text-clay"}`}
+      className={`inline-flex items-center gap-1.5 text-sm ${isCold ? "text-ledger" : "text-accent-amber"}`}
     >
       <span
-        className={`h-1.5 w-1.5 rounded-full ${isCold ? "bg-ledger" : "bg-clay"}`}
+        className={`h-1.5 w-1.5 rounded-full ${isCold ? "bg-ledger" : "bg-accent-amber"}`}
       />
       {CAMPAIGN_TYPE_LABELS[type]}
     </span>
   );
 }
+
+// ---------------------------------------------------------------------
+// Right-column panels below are visual stubs with representative static
+// numbers -- there's no health-scoring, interaction-logging, or
+// historical-snapshot data model in the schema yet. They exist to match
+// the mockup's layout ahead of that backend work; nothing here is wired
+// to real queries.
+// ---------------------------------------------------------------------
+
+const HEALTH_BAND = {
+  emerald: { text: "text-accent-emerald", bar: "bg-accent-emerald" },
+  amber: { text: "text-accent-amber", bar: "bg-accent-amber" },
+  coral: { text: "text-accent-coral", bar: "bg-accent-coral" },
+} as const;
+
+const HEALTH_INDEX_STUB = {
+  score: 87,
+  band: "emerald" as keyof typeof HEALTH_BAND,
+  factors: [
+    { label: "Response rate", value: "92%", pct: 92, band: "emerald" as const },
+    { label: "Payment timeliness", value: "On time", pct: 88, band: "emerald" as const },
+    { label: "Engagement frequency", value: "3.2 calls/wk", pct: 76, band: "amber" as const },
+    { label: "Escalations (90d)", value: "1", pct: 35, band: "coral" as const },
+  ],
+};
+
+function HealthIndexCard() {
+  const { score, band, factors } = HEALTH_INDEX_STUB;
+  return (
+    <div className="flex flex-col gap-4 glass-panel rounded-[var(--radius-lg)] p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="font-heading text-sm font-medium uppercase tracking-wide text-ink-muted">
+          Health Index
+        </h2>
+        <span className={`font-heading text-2xl font-bold tabular ${HEALTH_BAND[band].text}`}>
+          {score}
+          <span className="text-sm font-normal text-ink-muted">/100</span>
+        </span>
+      </div>
+      <div className="flex flex-col gap-3">
+        {factors.map((f) => (
+          <div key={f.label} className="flex flex-col gap-1">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-ink-muted">{f.label}</span>
+              <span className="tabular text-ink">{f.value}</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+              <div
+                className={`h-full rounded-full ${HEALTH_BAND[f.band].bar}`}
+                style={{ width: `${f.pct}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-ink-faint">
+        Illustrative -- health scoring isn&apos;t wired up for this client yet.
+      </p>
+    </div>
+  );
+}
+
+const TIMELINE_ICON_STYLES = {
+  call: "bg-[oklch(74%_0.15_224/0.16)] text-ledger",
+  note: "bg-[oklch(58%_0.14_270/0.16)] text-accent-violet",
+  payment: "bg-[oklch(74%_0.16_152/0.16)] text-accent-emerald",
+  list: "bg-[oklch(78%_0.15_85/0.16)] text-accent-amber",
+} as const;
+
+const TIMELINE_STUB: {
+  icon: keyof typeof TIMELINE_ICON_STYLES;
+  summary: string;
+  time: string;
+}[] = [
+  { icon: "call", summary: "Cold call completed with decision maker", time: "2h ago" },
+  { icon: "note", summary: "Pinned note updated by CSR", time: "1d ago" },
+  { icon: "payment", summary: "Monthly package payment confirmed", time: "3d ago" },
+  { icon: "list", summary: "New data list delivered (1,200 records)", time: "5d ago" },
+];
+
+function TimelineIcon({ icon }: { icon: keyof typeof TIMELINE_ICON_STYLES }) {
+  return (
+    <span
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${TIMELINE_ICON_STYLES[icon]}`}
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+    </span>
+  );
+}
+
+function InteractionTimelineCard() {
+  return (
+    <div className="flex flex-col gap-3 glass-panel rounded-[var(--radius-lg)] p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="font-heading text-sm font-medium uppercase tracking-wide text-ink-muted">
+          Interaction Timeline
+        </h2>
+        {/* No interactions log/route exists yet -- shown as inert text
+            rather than a link to nowhere. */}
+        <span className="text-xs text-ink-faint" title="Coming soon">
+          View all
+        </span>
+      </div>
+      <div className="flex flex-col gap-3">
+        {TIMELINE_STUB.map((row, i) => (
+          <div key={i} className="flex items-center gap-2.5 text-sm">
+            <TimelineIcon icon={row.icon} />
+            <span className="flex-1 text-ink">{row.summary}</span>
+            <span className="tabular shrink-0 text-xs text-ink-muted">{row.time}</span>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-ink-faint">
+        Illustrative -- interaction logging isn&apos;t wired up for this client yet.
+      </p>
+    </div>
+  );
+}
+
+const HISTORICAL_STUB = [
+  { label: "Response Rate", value: "92%", delta: "+8%", positive: true },
+  { label: "Records Delivered", value: "4,820", delta: "+12%", positive: true },
+  { label: "Escalations", value: "1", delta: "-2", positive: true },
+];
+
+function HistoricalComparisonCard() {
+  return (
+    <div className="flex flex-col gap-3 glass-panel rounded-[var(--radius-lg)] p-5">
+      <h2 className="font-heading text-sm font-medium uppercase tracking-wide text-ink-muted">
+        Historical Comparison
+      </h2>
+      <div className="grid grid-cols-3 gap-3">
+        {HISTORICAL_STUB.map((s) => (
+          <div key={s.label} className="flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{s.label}</span>
+            <span className="font-heading tabular text-xl text-ink">{s.value}</span>
+            <span
+              className={`text-xs ${s.positive ? "text-accent-emerald" : "text-accent-coral"}`}
+            >
+              {s.positive ? "↑" : "↓"} {s.delta} vs June
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-ink-faint">
+        Illustrative -- month-over-month snapshots aren&apos;t wired up for this client yet.
+      </p>
+    </div>
+  );
+}
+
+const UPSELL_PREVIEW = [
+  { stage: "Requested", title: "Add CC Seat", value: 100 },
+  { stage: "In Review", title: "DFY LM", value: 200 },
+  { stage: "Approved", title: "Texting Package Upgrade", value: 75 },
+];
+
+const ELEVATED_ROLES = ["tl", "hod", "admin"];
 
 export default async function CompanyProfilePage({
   params,
@@ -59,6 +224,8 @@ export default async function CompanyProfilePage({
     .eq("id", user?.id ?? "")
     .single();
 
+  const isElevated = !!callerProfile?.role && ELEVATED_ROLES.includes(callerProfile.role);
+
   // RLS scopes this to companies the signed-in user can see, so a CSR
   // navigating to a company outside their assignment hits notFound().
   const { data: company } = await supabase
@@ -69,25 +236,31 @@ export default async function CompanyProfilePage({
 
   if (!company) notFound();
 
-  const [{ data: services }, { data: pocClient }, { data: dataListLinks }] =
+  const [{ data: services }, { data: pocClient }, { data: associates }, { data: dataListLinks }] =
     await Promise.all([
       supabase
         .from("campaign_services")
-        .select(
-          "id, type, name, seat_count, texting_tier, rate_type"
-        )
+        .select("id, type, name, seat_count, texting_tier, rate_type")
         .eq("company_id", companyId)
         .order("created_at", { ascending: true }),
       // Package/data-sourcing config now lives on the POC client row
-      // (Sprint 3) -- companies is pure documentation.
+      // (Sprint 3) -- companies is pure documentation. created_at is
+      // included alongside the existing fields to power the header's
+      // "Client since" meta line (no new query, just one more column).
       supabase
         .from("clients")
         .select(
-          "id, name, assigned_csr_id, data_source_type, data_source_tier, package_tier, package_price, skip_tracing_type, skip_trace_rate"
+          "id, name, email, phone, title_at_company, assigned_csr_id, data_source_type, data_source_tier, package_tier, package_price, skip_tracing_type, skip_trace_rate, buy_box, script, pinned_notes, created_at"
         )
         .eq("company_id", companyId)
         .eq("is_poc", true)
         .maybeSingle(),
+      supabase
+        .from("clients")
+        .select("id, name, email, phone, role, preferred_contact_method")
+        .eq("company_id", companyId)
+        .eq("is_poc", false)
+        .order("created_at", { ascending: true }),
       // data_lists no longer FKs directly to a single campaign_service
       // (Sprint 3: multi-service lists) -- go through the join table and
       // group by data_list below.
@@ -101,7 +274,37 @@ export default async function CompanyProfilePage({
 
   const campaignServices = services ?? [];
   const totalSeats = campaignServices.reduce((sum, s) => sum + s.seat_count, 0);
-  const contact = pocClient;
+  const campaignTypeSet = new Set(campaignServices.map((s) => s.type));
+  const campaignSummary =
+    campaignServices.length === 0
+      ? undefined
+      : campaignTypeSet.size === 1
+        ? CAMPAIGN_TYPE_LABELS[[...campaignTypeSet][0]]
+        : `${campaignServices.length} campaigns`;
+
+  let assignedCsrName: string | null = null;
+  if (pocClient?.assigned_csr_id) {
+    const { data: csrUser } = await supabase
+      .from("users")
+      .select("name")
+      .eq("id", pocClient.assigned_csr_id)
+      .single();
+    assignedCsrName = csrUser?.name ?? null;
+  }
+
+  let csrOptions: { id: string; name: string }[] = [];
+  if (isElevated) {
+    const { data } = await supabase
+      .from("users")
+      .select("id, name")
+      .eq("role", "csr")
+      .order("name");
+    csrOptions = data ?? [];
+  }
+
+  const canEditProfile =
+    !!pocClient &&
+    (isElevated || (callerProfile?.role === "csr" && pocClient.assigned_csr_id === user?.id));
 
   const { data: paygRequests } = pocClient
     ? await supabase
@@ -141,156 +344,285 @@ export default async function CompanyProfilePage({
   );
 
   return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <p className="text-xs uppercase tracking-wide text-ink-muted">
-          Client
-        </p>
-        <h1 className="font-heading text-2xl text-ink">{company.name}</h1>
-        {contact && (
-          <p className="mt-1 text-sm text-ink-muted">
-            Primary contact: {contact.name}
-          </p>
-        )}
-        <p className="mt-3 text-sm text-ink-muted">
-          {campaignServices.length} campaign services ·{" "}
-          <span className="tabular">{totalSeats}</span> total seats
-        </p>
-        {pocClient?.data_source_type && (
-          <p className="mt-1 text-sm text-ink-muted">
-            Data source: {PROVIDER_TYPE_LABELS[pocClient.data_source_type]}
-            {pocClient.data_source_tier
-              ? ` · ${DATA_SOURCE_TIER_LABELS[pocClient.data_source_tier]}`
-              : ""}
-            {pocClient.package_tier
-              ? ` (${PACKAGE_TIER_LABELS[pocClient.package_tier]})`
-              : ""}
-            {pocClient.package_price !== null
-              ? ` · ${formatPrice(pocClient.package_price)}/mo`
-              : ""}
-            {pocClient.skip_tracing_type && (
-              <>
-                {" · "}
-                Skip tracing: {PROVIDER_TYPE_LABELS[pocClient.skip_tracing_type]}
-                {pocClient.skip_trace_rate !== null
-                  ? ` · ${formatPrice(pocClient.skip_trace_rate)}/record`
-                  : ""}
-              </>
-            )}
-          </p>
-        )}
-        <div className="mt-4 flex gap-3">
-          {callerProfile?.role === "csr" && (
-            <LogUpsellToggle companyId={companyId} campaignServices={campaignServices} />
-          )}
-          {pocClient &&
-            pocClient.data_source_tier !== "package" &&
-            (callerProfile?.role === "admin" ||
-              callerProfile?.role === "tl" ||
-              callerProfile?.role === "hod" ||
-              (callerProfile?.role === "csr" && pocClient.assigned_csr_id === user?.id)) && (
-              <AddToDataPackageToggle clientId={pocClient.id} />
-            )}
+    <div className="page-shell page-shell--profile">
+      {pocClient ? (
+        <ClientHeader
+          clientId={pocClient.id}
+          companyName={company.name}
+          name={pocClient.name}
+          email={pocClient.email}
+          phone={pocClient.phone}
+          title={pocClient.title_at_company}
+          assignedCsrId={pocClient.assigned_csr_id}
+          assignedCsrName={assignedCsrName}
+          csrs={csrOptions}
+          canEdit={canEditProfile}
+          canReassignCsr={isElevated}
+          campaignSummary={campaignSummary}
+          totalSeats={totalSeats}
+          packageTier={pocClient.package_tier}
+          createdAt={pocClient.created_at}
+        />
+      ) : (
+        <div>
+          <p className="text-xs uppercase tracking-wide text-ink-muted">Client</p>
+          <h1 className="font-heading text-2xl text-ink">{company.name}</h1>
         </div>
-      </div>
+      )}
 
-      <section>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-muted">
-          Campaign services
-        </h2>
-        <div className="border border-border bg-surface-raised">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Campaign</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="text-right">Seats</TableHead>
-                <TableHead>Rate</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {campaignServices.map((cs, i) => (
-                <TableRow
-                  key={cs.id}
-                  className={i % 2 === 1 ? "bg-surface-sunken/50" : undefined}
-                >
-                  <TableCell className="font-medium text-ink">
-                    {cs.name ??
-                      (cs.type === "texting" && cs.texting_tier
-                        ? `Texting — ${TEXTING_TIER_LABELS[cs.texting_tier]}`
-                        : "—")}
-                  </TableCell>
-                  <TableCell>
-                    <TypeIndicator type={cs.type} />
-                  </TableCell>
-                  <TableCell className="text-right tabular">
-                    {cs.seat_count}
-                  </TableCell>
-                  <TableCell>
-                    {cs.rate_type ? RATE_TYPE_LABELS[cs.rate_type] : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+      {pocClient && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
+          <div className="flex flex-col gap-4">
+            <BuyBoxCard
+              clientId={pocClient.id}
+              buyBox={toBuyBox(pocClient.buy_box)}
+              canEdit={canEditProfile}
+            />
+            <ScriptCard clientId={pocClient.id} script={pocClient.script} canEdit={canEditProfile} />
+            <PinnedNotesCard
+              clientId={pocClient.id}
+              pinnedNotes={pocClient.pinned_notes}
+              canEdit={canEditProfile}
+            />
+            <AssociatesCard
+              companyId={companyId}
+              associates={associates ?? []}
+              canEdit={canEditProfile}
+            />
+          </div>
+          <div className="flex flex-col gap-4">
+            <HealthIndexCard />
+            <InteractionTimelineCard />
+            <HistoricalComparisonCard />
+          </div>
         </div>
-      </section>
+      )}
 
-      <PaygRequestsPanel
-        clientId={pocClient?.id ?? null}
-        requests={paygRequests ?? []}
-        canCreate={
-          callerProfile?.role === "csr" && pocClient?.assigned_csr_id === user?.id
-        }
-      />
-
-      <section>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-muted">
-          Data list history
-        </h2>
-        {history.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 border border-dashed border-border bg-surface-raised py-16 text-center">
-            <p className="text-sm font-medium text-ink">No data lists yet</p>
-            <p className="max-w-sm text-sm text-ink-muted">
-              Data list uploads for this client&apos;s campaigns will appear
-              here once available.
+      <section className="flex flex-col gap-8 border-t border-border pt-8">
+        <div>
+          <p className="text-sm text-ink-muted">
+            {campaignServices.length} campaign services ·{" "}
+            <span className="tabular">{totalSeats}</span> total seats
+          </p>
+          {pocClient?.data_source_type && (
+            <p className="mt-1 text-sm text-ink-muted">
+              Data source: {PROVIDER_TYPE_LABELS[pocClient.data_source_type]}
+              {pocClient.data_source_tier
+                ? ` · ${DATA_SOURCE_TIER_LABELS[pocClient.data_source_tier]}`
+                : ""}
+              {pocClient.package_tier ? ` (${PACKAGE_TIER_LABELS[pocClient.package_tier]})` : ""}
+              {pocClient.package_price !== null
+                ? ` · ${formatPrice(pocClient.package_price)}/mo`
+                : ""}
+              {pocClient.skip_tracing_type && (
+                <>
+                  {" · "}
+                  Skip tracing: {PROVIDER_TYPE_LABELS[pocClient.skip_tracing_type]}
+                  {pocClient.skip_trace_rate !== null
+                    ? ` · ${formatPrice(pocClient.skip_trace_rate)}/record`
+                    : ""}
+                </>
+              )}
             </p>
+          )}
+          <div className="mt-4 flex gap-3">
+            {callerProfile?.role === "csr" && (
+              <LogUpsellToggle companyId={companyId} campaignServices={campaignServices} />
+            )}
+            {pocClient &&
+              pocClient.data_source_tier !== "package" &&
+              (isElevated ||
+                (callerProfile?.role === "csr" && pocClient.assigned_csr_id === user?.id)) && (
+                <AddToDataPackageToggle clientId={pocClient.id} />
+              )}
           </div>
-        ) : (
-          <div className="border border-border bg-surface-raised">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Campaign</TableHead>
-                  <TableHead className="text-right">Records</TableHead>
-                  <TableHead className="text-right">Accepted</TableHead>
-                  <TableHead className="text-right">Duplicates</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {history.map((dl, i) => (
-                  <TableRow
-                    key={dl.id}
-                    className={i % 2 === 1 ? "bg-surface-sunken/50" : undefined}
-                  >
-                    <TableCell className="tabular">{dl.list_date}</TableCell>
-                    <TableCell>{dl.serviceNames.join(", ")}</TableCell>
-                    <TableCell className="text-right tabular">
-                      {dl.records_count}
-                    </TableCell>
-                    <TableCell className="text-right tabular">
-                      {dl.records_accepted}
-                    </TableCell>
-                    <TableCell className="text-right tabular">
-                      {dl.duplicates}
-                    </TableCell>
+        </div>
+
+        {/* Pill-tab panel -- pure CSS radio-group tabs (no client JS) so
+            this stays a Server Component. Each `group-has-[#tab-x:checked]`
+            utility reaches into the subtree from the shared `group/tabs`
+            wrapper to toggle the matching label's active state and the
+            matching content panel's visibility. */}
+        <div className="group/tabs glass-panel rounded-[var(--radius-lg)] p-4 md:p-6">
+          <input type="radio" name="profile-tab" id="tab-services" className="sr-only" defaultChecked />
+          <input type="radio" name="profile-tab" id="tab-datalists" className="sr-only" />
+          <input type="radio" name="profile-tab" id="tab-payg" className="sr-only" />
+          <input type="radio" name="profile-tab" id="tab-upsells" className="sr-only" />
+          <input type="radio" name="profile-tab" id="tab-commission" className="sr-only" />
+
+          <div
+            role="radiogroup"
+            aria-label="Profile sections"
+            className="mb-5 flex flex-wrap gap-2 border-b border-white/10 pb-4"
+          >
+            {/* Tailwind's scanner needs literal class strings, so each tab's
+                `group-has-[#id:checked]` variant is spelled out below rather
+                than built with template-literal interpolation (which the
+                scanner can't statically extract). */}
+            <label
+              htmlFor="tab-services"
+              className="cursor-pointer rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-sm text-ink-muted backdrop-blur-sm transition-all hover:text-ink group-has-[#tab-services:checked]/tabs:border-[oklch(74%_0.15_224/0.5)] group-has-[#tab-services:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-services:checked]/tabs:text-ledger group-has-[#tab-services:checked]/tabs:shadow-[0_0_16px_0_oklch(74%_0.15_224/0.25)]"
+            >
+              Services
+            </label>
+            <label
+              htmlFor="tab-datalists"
+              className="cursor-pointer rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-sm text-ink-muted backdrop-blur-sm transition-all hover:text-ink group-has-[#tab-datalists:checked]/tabs:border-[oklch(74%_0.15_224/0.5)] group-has-[#tab-datalists:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-datalists:checked]/tabs:text-ledger group-has-[#tab-datalists:checked]/tabs:shadow-[0_0_16px_0_oklch(74%_0.15_224/0.25)]"
+            >
+              Data Lists
+            </label>
+            <label
+              htmlFor="tab-payg"
+              className="cursor-pointer rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-sm text-ink-muted backdrop-blur-sm transition-all hover:text-ink group-has-[#tab-payg:checked]/tabs:border-[oklch(74%_0.15_224/0.5)] group-has-[#tab-payg:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-payg:checked]/tabs:text-ledger group-has-[#tab-payg:checked]/tabs:shadow-[0_0_16px_0_oklch(74%_0.15_224/0.25)]"
+            >
+              PAYG Requests
+            </label>
+            <label
+              htmlFor="tab-upsells"
+              className="cursor-pointer rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-sm text-ink-muted backdrop-blur-sm transition-all hover:text-ink group-has-[#tab-upsells:checked]/tabs:border-[oklch(74%_0.15_224/0.5)] group-has-[#tab-upsells:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-upsells:checked]/tabs:text-ledger group-has-[#tab-upsells:checked]/tabs:shadow-[0_0_16px_0_oklch(74%_0.15_224/0.25)]"
+            >
+              Upsells
+            </label>
+            <label
+              htmlFor="tab-commission"
+              className="cursor-pointer rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-sm text-ink-muted backdrop-blur-sm transition-all hover:text-ink group-has-[#tab-commission:checked]/tabs:border-[oklch(74%_0.15_224/0.5)] group-has-[#tab-commission:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-commission:checked]/tabs:text-ledger group-has-[#tab-commission:checked]/tabs:shadow-[0_0_16px_0_oklch(74%_0.15_224/0.25)]"
+            >
+              Commission
+            </label>
+          </div>
+
+          <div className="hidden group-has-[#tab-services:checked]/tabs:block">
+            <div className="glass-panel rounded-[var(--radius-lg)]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Campaign</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Seats</TableHead>
+                    <TableHead>Rate</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {campaignServices.map((cs, i) => (
+                    <TableRow
+                      key={cs.id}
+                      className={i % 2 === 1 ? "bg-surface-sunken/50" : undefined}
+                    >
+                      <TableCell className="font-medium text-ink">
+                        {cs.name ??
+                          (cs.type === "texting" && cs.texting_tier
+                            ? `Texting — ${TEXTING_TIER_LABELS[cs.texting_tier]}`
+                            : "—")}
+                      </TableCell>
+                      <TableCell>
+                        <TypeIndicator type={cs.type} />
+                      </TableCell>
+                      <TableCell className="text-right tabular">{cs.seat_count}</TableCell>
+                      <TableCell>{cs.rate_type ? RATE_TYPE_LABELS[cs.rate_type] : "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-        )}
+
+          <div className="hidden group-has-[#tab-datalists:checked]/tabs:block">
+            {history.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 glass-panel border-dashed border-white/15 rounded-[var(--radius-lg)] py-16 text-center">
+                <p className="text-sm font-medium text-ink">No data lists yet</p>
+                <p className="max-w-sm text-sm text-ink-muted">
+                  Data list uploads for this client&apos;s campaigns will appear here once
+                  available.
+                </p>
+              </div>
+            ) : (
+              <div className="glass-panel rounded-[var(--radius-lg)]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Campaign</TableHead>
+                      <TableHead className="text-right">Records</TableHead>
+                      <TableHead className="text-right">Accepted</TableHead>
+                      <TableHead className="text-right">Duplicates</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {history.map((dl, i) => (
+                      <TableRow
+                        key={dl.id}
+                        className={i % 2 === 1 ? "bg-surface-sunken/50" : undefined}
+                      >
+                        <TableCell className="tabular">{dl.list_date}</TableCell>
+                        <TableCell>{dl.serviceNames.join(", ")}</TableCell>
+                        <TableCell className="text-right tabular">{dl.records_count}</TableCell>
+                        <TableCell className="text-right tabular">{dl.records_accepted}</TableCell>
+                        <TableCell className="text-right tabular">{dl.duplicates}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          <div className="hidden group-has-[#tab-payg:checked]/tabs:block">
+            <PaygRequestsPanel
+              clientId={pocClient?.id ?? null}
+              requests={paygRequests ?? []}
+              canCreate={callerProfile?.role === "csr" && pocClient?.assigned_csr_id === user?.id}
+            />
+          </div>
+
+          <div className="hidden group-has-[#tab-upsells:checked]/tabs:block">
+            <p className="mb-3 text-xs text-ink-faint">
+              Preview layout -- upsell tracking isn&apos;t wired up for this view yet.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {UPSELL_PREVIEW.map((u) => (
+                <div
+                  key={u.title}
+                  className="flex w-48 flex-col gap-2 glass-panel rounded-[var(--radius-md)] p-3"
+                >
+                  <span className="text-[10px] font-medium tracking-wide text-ink-faint uppercase">
+                    {u.stage}
+                  </span>
+                  <p className="text-sm font-medium text-ink">{u.title}</p>
+                  <p className="text-xs text-ink-muted">{company.name}</p>
+                  <p className="tabular text-sm font-semibold text-accent-emerald">
+                    ${u.value}/mo
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="hidden group-has-[#tab-commission:checked]/tabs:block">
+            <p className="mb-3 text-xs text-ink-faint">
+              Preview layout -- commission totals for this client aren&apos;t wired up here yet.
+              See the{" "}
+              <Link href="/commissions" className="text-ledger hover:underline">
+                Commissions
+              </Link>{" "}
+              page.
+            </p>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {[
+                { label: "Package commission", value: 0 },
+                { label: "PAYG commission", value: 0 },
+                { label: "Upsell commission", value: 0 },
+                { label: "Total commission", value: 0 },
+              ].map((c) => (
+                <div key={c.label} className="glass-panel flex flex-col gap-1 rounded-[var(--radius-md)] p-3">
+                  <span className="text-xs text-ink-muted">{c.label}</span>
+                  <span className="font-heading tabular text-xl text-ink">
+                    {formatPrice(c.value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </section>
     </div>
   );

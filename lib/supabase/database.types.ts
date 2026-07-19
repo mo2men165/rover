@@ -58,6 +58,7 @@ export type Database = {
       clients: {
         Row: {
           assigned_csr_id: string | null
+          buy_box: Json | null
           company_id: string
           created_at: string
           data_source_tier:
@@ -73,6 +74,12 @@ export type Database = {
           package_start_date: string | null
           package_tier: Database["public"]["Enums"]["package_tier"] | null
           phone: string | null
+          pinned_notes: string | null
+          preferred_contact_method:
+            | Database["public"]["Enums"]["contact_method"]
+            | null
+          role: string | null
+          script: Database["public"]["Enums"]["client_script"] | null
           skip_trace_rate: number | null
           skip_trace_rate_tier:
             | Database["public"]["Enums"]["skip_trace_rate_tier"]
@@ -82,6 +89,7 @@ export type Database = {
         }
         Insert: {
           assigned_csr_id?: string | null
+          buy_box?: Json | null
           company_id: string
           created_at?: string
           data_source_tier?:
@@ -97,6 +105,12 @@ export type Database = {
           package_start_date?: string | null
           package_tier?: Database["public"]["Enums"]["package_tier"] | null
           phone?: string | null
+          pinned_notes?: string | null
+          preferred_contact_method?:
+            | Database["public"]["Enums"]["contact_method"]
+            | null
+          role?: string | null
+          script?: Database["public"]["Enums"]["client_script"] | null
           skip_trace_rate?: number | null
           skip_trace_rate_tier?:
             | Database["public"]["Enums"]["skip_trace_rate_tier"]
@@ -108,6 +122,7 @@ export type Database = {
         }
         Update: {
           assigned_csr_id?: string | null
+          buy_box?: Json | null
           company_id?: string
           created_at?: string
           data_source_tier?:
@@ -123,6 +138,12 @@ export type Database = {
           package_start_date?: string | null
           package_tier?: Database["public"]["Enums"]["package_tier"] | null
           phone?: string | null
+          pinned_notes?: string | null
+          preferred_contact_method?:
+            | Database["public"]["Enums"]["contact_method"]
+            | null
+          role?: string | null
+          script?: Database["public"]["Enums"]["client_script"] | null
           skip_trace_rate?: number | null
           skip_trace_rate_tier?:
             | Database["public"]["Enums"]["skip_trace_rate_tier"]
@@ -474,6 +495,8 @@ export type Database = {
     }
     Enums: {
       campaign_type: "cold_calling" | "texting"
+      client_script: "four_pillars" | "motivation_only"
+      contact_method: "email" | "phone" | "text"
       data_source_tier: "package" | "payg" | "legacy"
       package_tier: "starter" | "pro" | "growth"
       provider_type: "res" | "self_provided"
@@ -616,6 +639,8 @@ export const Constants = {
   public: {
     Enums: {
       campaign_type: ["cold_calling", "texting"],
+      client_script: ["four_pillars", "motivation_only"],
+      contact_method: ["email", "phone", "text"],
       data_source_tier: ["package", "payg", "legacy"],
       package_tier: ["starter", "pro", "growth"],
       provider_type: ["res", "self_provided"],
