@@ -61,6 +61,32 @@ export const CONTACT_METHOD_LABELS: Record<Enums["contact_method"], string> = {
   text: "Text",
 };
 
+export const INTERACTION_TYPE_LABELS: Record<Enums["interaction_type"], string> = {
+  email: "Email",
+  call: "Call",
+  sms: "SMS",
+  whatsapp: "WhatsApp",
+  slack: "Slack",
+  meeting: "Meeting",
+  note: "Note",
+};
+
+export const INTERACTION_DIRECTION_LABELS: Record<
+  Enums["interaction_direction"],
+  string
+> = {
+  inbound: "Inbound",
+  outbound: "Outbound",
+  internal: "Internal",
+};
+
+export const INTERACTION_SOURCE_LABELS: Record<Enums["interaction_source"], string> = {
+  manual: "Manual",
+  gmail: "Gmail",
+  fathom: "Fathom",
+  hubspot_sync: "HubSpot",
+};
+
 export const UPSELL_TYPE_LABELS: Record<Enums["upsell_type"], string> = {
   add_cc_seat: "Add CC Seat",
   add_texting_service: "Add Texting Service",

@@ -66,6 +66,7 @@ export type Database = {
             | null
           data_source_type: Database["public"]["Enums"]["provider_type"] | null
           email: string | null
+          hs_object_id: string | null
           id: string
           is_poc: boolean
           name: string
@@ -97,6 +98,7 @@ export type Database = {
             | null
           data_source_type?: Database["public"]["Enums"]["provider_type"] | null
           email?: string | null
+          hs_object_id?: string | null
           id?: string
           is_poc?: boolean
           name: string
@@ -130,6 +132,7 @@ export type Database = {
             | null
           data_source_type?: Database["public"]["Enums"]["provider_type"] | null
           email?: string | null
+          hs_object_id?: string | null
           id?: string
           is_poc?: boolean
           name?: string
@@ -214,6 +217,283 @@ export type Database = {
             columns: ["data_list_id"]
             isOneToOne: false
             referencedRelation: "data_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interactions: {
+        Row: {
+          client_id: string
+          created_at: string
+          direction: Database["public"]["Enums"]["interaction_direction"]
+          external_id: string | null
+          hubspot_sync_note: string | null
+          hubspot_synced: boolean
+          id: string
+          logged_by: string
+          occurred_at: string
+          source: Database["public"]["Enums"]["interaction_source"]
+          summary: string
+          type: Database["public"]["Enums"]["interaction_type"]
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          direction: Database["public"]["Enums"]["interaction_direction"]
+          external_id?: string | null
+          hubspot_sync_note?: string | null
+          hubspot_synced?: boolean
+          id?: string
+          logged_by: string
+          occurred_at?: string
+          source?: Database["public"]["Enums"]["interaction_source"]
+          summary: string
+          type: Database["public"]["Enums"]["interaction_type"]
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          direction?: Database["public"]["Enums"]["interaction_direction"]
+          external_id?: string | null
+          hubspot_sync_note?: string | null
+          hubspot_synced?: boolean
+          id?: string
+          logged_by?: string
+          occurred_at?: string
+          source?: Database["public"]["Enums"]["interaction_source"]
+          summary?: string
+          type?: Database["public"]["Enums"]["interaction_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interactions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interactions_logged_by_fkey"
+            columns: ["logged_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          body: string
+          created_at: string
+          dismissed_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          payload: Json | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          payload?: Json | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["notification_kind"]
+          payload?: Json | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_accounts: {
+        Row: {
+          connected_at: string
+          gmail_address: string
+          history_id: string | null
+          id: string
+          refresh_token_enc: string | null
+          user_id: string
+          watch_expiry: string | null
+        }
+        Insert: {
+          connected_at?: string
+          gmail_address: string
+          history_id?: string | null
+          id?: string
+          refresh_token_enc?: string | null
+          user_id: string
+          watch_expiry?: string | null
+        }
+        Update: {
+          connected_at?: string
+          gmail_address?: string
+          history_id?: string | null
+          id?: string
+          refresh_token_enc?: string | null
+          user_id?: string
+          watch_expiry?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_threads: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          email_account_id: string
+          gmail_thread_id: string
+          id: string
+          interaction_id: string | null
+          last_message_at: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: Database["public"]["Enums"]["email_thread_status"]
+          subject: string | null
+          summary: string | null
+          user_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          email_account_id: string
+          gmail_thread_id: string
+          id?: string
+          interaction_id?: string | null
+          last_message_at?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["email_thread_status"]
+          subject?: string | null
+          summary?: string | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          email_account_id?: string
+          gmail_thread_id?: string
+          id?: string
+          interaction_id?: string | null
+          last_message_at?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["email_thread_status"]
+          subject?: string | null
+          summary?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_threads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_threads_email_account_id_fkey"
+            columns: ["email_account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_threads_interaction_id_fkey"
+            columns: ["interaction_id"]
+            isOneToOne: false
+            referencedRelation: "interactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_threads_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_threads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_messages: {
+        Row: {
+          body_text: string | null
+          created_at: string
+          direction: Database["public"]["Enums"]["interaction_direction"] | null
+          from_address: string | null
+          gmail_message_id: string
+          id: string
+          sent_at: string | null
+          snippet: string | null
+          subject: string | null
+          thread_id: string
+          to_addresses: string[] | null
+        }
+        Insert: {
+          body_text?: string | null
+          created_at?: string
+          direction?:
+            | Database["public"]["Enums"]["interaction_direction"]
+            | null
+          from_address?: string | null
+          gmail_message_id: string
+          id?: string
+          sent_at?: string | null
+          snippet?: string | null
+          subject?: string | null
+          thread_id: string
+          to_addresses?: string[] | null
+        }
+        Update: {
+          body_text?: string | null
+          created_at?: string
+          direction?:
+            | Database["public"]["Enums"]["interaction_direction"]
+            | null
+          from_address?: string | null
+          gmail_message_id?: string
+          id?: string
+          sent_at?: string | null
+          snippet?: string | null
+          subject?: string | null
+          thread_id?: string
+          to_addresses?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "email_threads"
             referencedColumns: ["id"]
           },
         ]
@@ -498,6 +778,18 @@ export type Database = {
       client_script: "four_pillars" | "motivation_only"
       contact_method: "email" | "phone" | "text"
       data_source_tier: "package" | "payg" | "legacy"
+      email_thread_status: "open" | "done" | "ignored"
+      interaction_direction: "inbound" | "outbound" | "internal"
+      interaction_source: "manual" | "gmail" | "fathom" | "hubspot_sync"
+      interaction_type:
+        | "email"
+        | "call"
+        | "sms"
+        | "whatsapp"
+        | "slack"
+        | "meeting"
+        | "note"
+      notification_kind: "eod_no_interaction" | "open_email_threads"
       package_tier: "starter" | "pro" | "growth"
       provider_type: "res" | "self_provided"
       rate_type: "standard" | "promo"

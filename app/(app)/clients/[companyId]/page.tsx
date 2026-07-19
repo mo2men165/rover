@@ -25,6 +25,7 @@ import { BuyBoxCard } from "@/components/clients/buy-box-card";
 import { ScriptCard } from "@/components/clients/script-card";
 import { PinnedNotesCard } from "@/components/clients/pinned-notes-card";
 import { AssociatesCard } from "@/components/clients/associates-card";
+import { InteractionTimeline } from "@/components/interactions/interaction-timeline";
 import { toBuyBox } from "@/lib/supabase/buy-box-options";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -50,11 +51,10 @@ function TypeIndicator({ type }: { type: CampaignType }) {
 }
 
 // ---------------------------------------------------------------------
-// Right-column panels below are visual stubs with representative static
-// numbers -- there's no health-scoring, interaction-logging, or
-// historical-snapshot data model in the schema yet. They exist to match
-// the mockup's layout ahead of that backend work; nothing here is wired
-// to real queries.
+// Right-column Health Index / Historical panels below are visual stubs
+// with representative static numbers -- there's no health-scoring or
+// historical-snapshot data model in the schema yet. Interaction Timeline
+// is live (Part 2).
 // ---------------------------------------------------------------------
 
 const HEALTH_BAND = {
@@ -105,63 +105,6 @@ function HealthIndexCard() {
       </div>
       <p className="text-xs text-ink-faint">
         Illustrative -- health scoring isn&apos;t wired up for this client yet.
-      </p>
-    </div>
-  );
-}
-
-const TIMELINE_ICON_STYLES = {
-  call: "bg-[oklch(74%_0.15_224/0.16)] text-ledger",
-  note: "bg-[oklch(58%_0.14_270/0.16)] text-accent-violet",
-  payment: "bg-[oklch(74%_0.16_152/0.16)] text-accent-emerald",
-  list: "bg-[oklch(78%_0.15_85/0.16)] text-accent-amber",
-} as const;
-
-const TIMELINE_STUB: {
-  icon: keyof typeof TIMELINE_ICON_STYLES;
-  summary: string;
-  time: string;
-}[] = [
-  { icon: "call", summary: "Cold call completed with decision maker", time: "2h ago" },
-  { icon: "note", summary: "Pinned note updated by CSR", time: "1d ago" },
-  { icon: "payment", summary: "Monthly package payment confirmed", time: "3d ago" },
-  { icon: "list", summary: "New data list delivered (1,200 records)", time: "5d ago" },
-];
-
-function TimelineIcon({ icon }: { icon: keyof typeof TIMELINE_ICON_STYLES }) {
-  return (
-    <span
-      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${TIMELINE_ICON_STYLES[icon]}`}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-    </span>
-  );
-}
-
-function InteractionTimelineCard() {
-  return (
-    <div className="flex flex-col gap-3 glass-panel rounded-[var(--radius-lg)] p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="font-heading text-sm font-medium uppercase tracking-wide text-ink-muted">
-          Interaction Timeline
-        </h2>
-        {/* No interactions log/route exists yet -- shown as inert text
-            rather than a link to nowhere. */}
-        <span className="text-xs text-ink-faint" title="Coming soon">
-          View all
-        </span>
-      </div>
-      <div className="flex flex-col gap-3">
-        {TIMELINE_STUB.map((row, i) => (
-          <div key={i} className="flex items-center gap-2.5 text-sm">
-            <TimelineIcon icon={row.icon} />
-            <span className="flex-1 text-ink">{row.summary}</span>
-            <span className="tabular shrink-0 text-xs text-ink-muted">{row.time}</span>
-          </div>
-        ))}
-      </div>
-      <p className="text-xs text-ink-faint">
-        Illustrative -- interaction logging isn&apos;t wired up for this client yet.
       </p>
     </div>
   );
@@ -343,6 +286,49 @@ export default async function CompanyProfilePage({
     b.list_date.localeCompare(a.list_date)
   );
 
+  const clientIds = [
+    ...(pocClient ? [pocClient.id] : []),
+    ...(associates ?? []).map((a) => a.id),
+  ];
+
+  let timelineRows: {
+    id: string;
+    type: Database["public"]["Enums"]["interaction_type"];
+    direction: Database["public"]["Enums"]["interaction_direction"];
+    source: Database["public"]["Enums"]["interaction_source"];
+    summary: string;
+    occurred_at: string;
+    hubspot_synced: boolean;
+    hubspot_sync_note: string | null;
+    logged_by_name: string;
+  }[] = [];
+
+  if (clientIds.length > 0) {
+    const { data: interactionRows } = await supabase
+      .from("interactions")
+      .select(
+        "id, type, direction, source, summary, occurred_at, hubspot_synced, hubspot_sync_note, logger:users!interactions_logged_by_fkey(name)"
+      )
+      .in("client_id", clientIds)
+      .order("occurred_at", { ascending: false })
+      .limit(40);
+
+    timelineRows = (interactionRows ?? []).map((row) => {
+      const logger = Array.isArray(row.logger) ? row.logger[0] : row.logger;
+      return {
+        id: row.id,
+        type: row.type,
+        direction: row.direction,
+        source: row.source,
+        summary: row.summary,
+        occurred_at: row.occurred_at,
+        hubspot_synced: row.hubspot_synced,
+        hubspot_sync_note: row.hubspot_sync_note,
+        logged_by_name: logger?.name ?? "Unknown",
+      };
+    });
+  }
+
   return (
     <div className="page-shell page-shell--profile">
       {pocClient ? (
@@ -392,7 +378,7 @@ export default async function CompanyProfilePage({
           </div>
           <div className="flex flex-col gap-4">
             <HealthIndexCard />
-            <InteractionTimelineCard />
+            <InteractionTimeline interactions={timelineRows} companyId={companyId} />
             <HistoricalComparisonCard />
           </div>
         </div>
