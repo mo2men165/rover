@@ -38,8 +38,13 @@ import {
   HealthIndexCard,
   type HealthIndexData,
 } from "@/components/churn/health-index-card";
+import { IndexPanel } from "@/components/clients/index-panel";
 import { computeAndPersistChurnScore } from "@/lib/churn/compute";
 import { SIGNAL_META, type SignalKey } from "@/lib/churn/score";
+import {
+  loadIndexPanelData,
+  type IndexPanelData,
+} from "@/lib/index-panel/load";
 import { toBuyBox } from "@/lib/supabase/buy-box-options";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -332,6 +337,18 @@ export default async function CompanyProfilePage({
     };
   }
 
+  let indexPanel: IndexPanelData | null = null;
+  if (pocClient && clientIds.length > 0) {
+    indexPanel = await loadIndexPanelData(supabase, {
+      clientIds,
+      pocClientId: pocClient.id,
+      companyId,
+      clientCreatedAt: pocClient.created_at,
+      // Part 3 score — reference only, do not recompute.
+      churnRiskScore: healthIndex?.riskScore ?? null,
+    });
+  }
+
   let activeOpportunities: ClientOpportunityRow[] = [];
   let loggedUpsells: {
     id: string;
@@ -421,6 +438,7 @@ export default async function CompanyProfilePage({
             />
           </div>
           <div className="flex flex-col gap-4">
+            {indexPanel && <IndexPanel data={indexPanel} />}
             {healthIndex && <HealthIndexCard data={healthIndex} />}
             {pocClient && (
               <ClientOpportunitiesPanel opportunities={activeOpportunities} />
