@@ -6,28 +6,38 @@ import type { Database } from "@/lib/supabase/database.types";
 
 type TextingTier = Database["public"]["Enums"]["texting_tier"];
 
+type LogUpsellBase = {
+  notes?: string;
+  /** Set when the upsell closes a pipeline opportunity. */
+  upsellOpportunityId?: string;
+  /**
+   * When an elevated role closes a pipeline win on behalf of the
+   * assigned CSR, pass actingAsElevated + csrId so ownership still
+   * attributes the commission correctly.
+   */
+  actingAsElevated?: boolean;
+  csrId?: string;
+};
+
 type LogUpsellInput =
-  | {
+  | ({
       upsellType: "add_cc_seat";
       companyId: string;
       campaignServiceId: string;
       quantity: number;
-      notes?: string;
-    }
-  | {
+    } & LogUpsellBase)
+  | ({
       upsellType: "add_texting_service";
       companyId: string;
       textingTier: TextingTier;
-      notes?: string;
-    }
-  | { upsellType: "dwy_lm" | "dfy_lm"; companyId: string; notes?: string }
-  | {
+    } & LogUpsellBase)
+  | ({ upsellType: "dwy_lm" | "dfy_lm"; companyId: string } & LogUpsellBase)
+  | ({
       upsellType: "texting_package_upgrade";
       companyId: string;
       campaignServiceId: string;
       toTier: TextingTier;
-      notes?: string;
-    };
+    } & LogUpsellBase);
 
 type LogUpsellResult = { success: true } | { success: false; error: string };
 
@@ -53,7 +63,11 @@ export async function logUpsell(input: LogUpsellInput): Promise<LogUpsellResult>
     .eq("id", user.id)
     .single();
 
-  if (callerProfile?.role !== "csr") {
+  const elevated = new Set(["tl", "hod", "admin", "sysadmin"]);
+  const isElevated = !!callerProfile?.role && elevated.has(callerProfile.role);
+  const isCsr = callerProfile?.role === "csr";
+
+  if (!isCsr && !(input.actingAsElevated && isElevated)) {
     return { success: false, error: "Only CSRs can log upsells." };
   }
 
@@ -63,6 +77,7 @@ export async function logUpsell(input: LogUpsellInput): Promise<LogUpsellResult>
   // company (assigned_csr_id lives on the POC client row as of Sprint 3,
   // not companies) — otherwise a crafted request could log an upsell
   // (and its commission) against another CSR's client.
+  // Elevated roles closing a pipeline win pass actingAsElevated + csrId.
   const { data: pocClient } = await admin
     .from("clients")
     .select("assigned_csr_id")
@@ -70,9 +85,25 @@ export async function logUpsell(input: LogUpsellInput): Promise<LogUpsellResult>
     .eq("is_poc", true)
     .maybeSingle();
 
-  if (!pocClient || pocClient.assigned_csr_id !== user.id) {
+  if (!pocClient?.assigned_csr_id) {
+    return { success: false, error: "This client has no assigned CSR." };
+  }
+
+  if (isCsr && pocClient.assigned_csr_id !== user.id) {
     return { success: false, error: "You are not assigned to this client." };
   }
+
+  if (input.actingAsElevated) {
+    if (!input.csrId) {
+      return { success: false, error: "Assigned CSR is required for elevated closes." };
+    }
+    if (input.csrId !== pocClient.assigned_csr_id) {
+      return { success: false, error: "CSR does not match this client assignment." };
+    }
+  }
+
+  const csrId = input.actingAsElevated ? input.csrId! : user.id;
+  const opportunityId = input.upsellOpportunityId ?? null;
 
   const { data: ownedServices } = await admin
     .from("campaign_services")
@@ -100,12 +131,13 @@ export async function logUpsell(input: LogUpsellInput): Promise<LogUpsellResult>
     const { error: insertError } = await admin.from("upsells").insert({
       company_id: input.companyId,
       campaign_service_id: service.id,
-      csr_id: user.id,
+      csr_id: csrId,
       upsell_type: "add_cc_seat",
       quantity: input.quantity,
       unit_amount: 0,
       notes: input.notes ?? null,
       created_by: user.id,
+      upsell_opportunity_id: opportunityId,
     });
     if (insertError) return { success: false, error: insertError.message };
     return { success: true };
@@ -132,12 +164,13 @@ export async function logUpsell(input: LogUpsellInput): Promise<LogUpsellResult>
     const { error: insertError } = await admin.from("upsells").insert({
       company_id: input.companyId,
       campaign_service_id: newService.id,
-      csr_id: user.id,
+      csr_id: csrId,
       upsell_type: "add_texting_service",
       quantity: 1,
       unit_amount: 0,
       notes: input.notes ?? null,
       created_by: user.id,
+      upsell_opportunity_id: opportunityId,
     });
     if (insertError) return { success: false, error: insertError.message };
     return { success: true };
@@ -161,7 +194,7 @@ export async function logUpsell(input: LogUpsellInput): Promise<LogUpsellResult>
     const { error: insertError } = await admin.from("upsells").insert({
       company_id: input.companyId,
       campaign_service_id: service.id,
-      csr_id: user.id,
+      csr_id: csrId,
       upsell_type: "texting_package_upgrade",
       quantity: 1,
       unit_amount: 0,
@@ -169,6 +202,7 @@ export async function logUpsell(input: LogUpsellInput): Promise<LogUpsellResult>
       to_tier: input.toTier,
       notes: input.notes ?? null,
       created_by: user.id,
+      upsell_opportunity_id: opportunityId,
     });
     if (insertError) return { success: false, error: insertError.message };
     return { success: true };
@@ -178,12 +212,13 @@ export async function logUpsell(input: LogUpsellInput): Promise<LogUpsellResult>
   const { error: insertError } = await admin.from("upsells").insert({
     company_id: input.companyId,
     campaign_service_id: null,
-    csr_id: user.id,
+    csr_id: csrId,
     upsell_type: input.upsellType,
     quantity: 1,
     unit_amount: 0,
     notes: input.notes ?? null,
     created_by: user.id,
+    upsell_opportunity_id: opportunityId,
   });
   if (insertError) return { success: false, error: insertError.message };
   return { success: true };

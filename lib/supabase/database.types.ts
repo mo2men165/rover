@@ -790,6 +790,63 @@ export type Database = {
           },
         ]
       }
+      upsell_opportunities: {
+        Row: {
+          client_id: string
+          created_at: string
+          csr_id: string
+          id: string
+          lost_reason: string | null
+          notes: string | null
+          quantity: number
+          snooze_until: string | null
+          stage: Database["public"]["Enums"]["upsell_stage"]
+          updated_at: string
+          upsell_type: Database["public"]["Enums"]["upsell_type"]
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          csr_id: string
+          id?: string
+          lost_reason?: string | null
+          notes?: string | null
+          quantity?: number
+          snooze_until?: string | null
+          stage?: Database["public"]["Enums"]["upsell_stage"]
+          updated_at?: string
+          upsell_type: Database["public"]["Enums"]["upsell_type"]
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          csr_id?: string
+          id?: string
+          lost_reason?: string | null
+          notes?: string | null
+          quantity?: number
+          snooze_until?: string | null
+          stage?: Database["public"]["Enums"]["upsell_stage"]
+          updated_at?: string
+          upsell_type?: Database["public"]["Enums"]["upsell_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upsell_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upsell_opportunities_csr_id_fkey"
+            columns: ["csr_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       upsells: {
         Row: {
           campaign_service_id: string | null
@@ -804,6 +861,7 @@ export type Database = {
           to_tier: string | null
           total_amount: number | null
           unit_amount: number
+          upsell_opportunity_id: string | null
           upsell_type: Database["public"]["Enums"]["upsell_type"]
         }
         Insert: {
@@ -819,6 +877,7 @@ export type Database = {
           to_tier?: string | null
           total_amount?: number | null
           unit_amount: number
+          upsell_opportunity_id?: string | null
           upsell_type: Database["public"]["Enums"]["upsell_type"]
         }
         Update: {
@@ -834,6 +893,7 @@ export type Database = {
           to_tier?: string | null
           total_amount?: number | null
           unit_amount?: number
+          upsell_opportunity_id?: string | null
           upsell_type?: Database["public"]["Enums"]["upsell_type"]
         }
         Relationships: [
@@ -863,6 +923,13 @@ export type Database = {
             columns: ["csr_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upsells_upsell_opportunity_id_fkey"
+            columns: ["upsell_opportunity_id"]
+            isOneToOne: true
+            referencedRelation: "upsell_opportunities"
             referencedColumns: ["id"]
           },
         ]
@@ -951,6 +1018,7 @@ export type Database = {
       rate_type: "standard" | "promo"
       skip_trace_rate_tier: "0.09" | "0.07" | "0.0525" | "custom"
       texting_tier: "50k" | "75k" | "100k"
+      upsell_stage: "opportunity" | "pitched" | "pending" | "won" | "lost"
       upsell_type:
         | "add_cc_seat"
         | "add_texting_service"
@@ -1112,6 +1180,7 @@ export const Constants = {
       rate_type: ["standard", "promo"],
       skip_trace_rate_tier: ["0.09", "0.07", "0.0525", "custom"],
       texting_tier: ["50k", "75k", "100k"],
+      upsell_stage: ["opportunity", "pitched", "pending", "won", "lost"],
       upsell_type: [
         "add_cc_seat",
         "add_texting_service",

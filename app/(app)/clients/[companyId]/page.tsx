@@ -18,6 +18,14 @@ import {
   TEXTING_TIER_LABELS,
 } from "@/lib/supabase/labels";
 import { LogUpsellToggle } from "@/components/upsells/log-upsell-toggle";
+import {
+  ClientOpportunitiesPanel,
+  type ClientOpportunityRow,
+} from "@/components/upsells/client-opportunities-panel";
+import {
+  UPSELL_TYPE_LABELS,
+  UPSELL_UNIT_AMOUNTS,
+} from "@/lib/supabase/labels";
 import { PaygRequestsPanel } from "@/components/payg/payg-requests-panel";
 import { AddToDataPackageToggle } from "@/components/clients/add-to-data-package-toggle";
 import { ClientHeader } from "@/components/clients/client-header";
@@ -92,12 +100,6 @@ function HistoricalComparisonCard() {
     </div>
   );
 }
-
-const UPSELL_PREVIEW = [
-  { stage: "Requested", title: "Add CC Seat", value: 100 },
-  { stage: "In Review", title: "DFY LM", value: 200 },
-  { stage: "Approved", title: "Texting Package Upgrade", value: 75 },
-];
 
 const ELEVATED_ROLES = ["tl", "hod", "admin"];
 
@@ -330,6 +332,47 @@ export default async function CompanyProfilePage({
     };
   }
 
+  let activeOpportunities: ClientOpportunityRow[] = [];
+  let loggedUpsells: {
+    id: string;
+    upsell_type: Database["public"]["Enums"]["upsell_type"];
+    quantity: number;
+    total_amount: number | null;
+    created_at: string;
+  }[] = [];
+
+  if (pocClient) {
+    const [{ data: oppRows }, { data: upsellRows }] = await Promise.all([
+      supabase
+        .from("upsell_opportunities")
+        .select(
+          "id, upsell_type, stage, quantity, snooze_until, csr:users!upsell_opportunities_csr_id_fkey(name)"
+        )
+        .eq("client_id", pocClient.id)
+        .in("stage", ["opportunity", "pitched", "pending"])
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("upsells")
+        .select("id, upsell_type, quantity, total_amount, created_at")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false })
+        .limit(20),
+    ]);
+
+    activeOpportunities = (oppRows ?? []).map((row) => {
+      const csr = Array.isArray(row.csr) ? row.csr[0] : row.csr;
+      return {
+        id: row.id,
+        upsellType: row.upsell_type,
+        stage: row.stage,
+        quantity: row.quantity,
+        snoozeUntil: row.snooze_until,
+        csrName: csr?.name ?? "Unassigned",
+      };
+    });
+    loggedUpsells = upsellRows ?? [];
+  }
+
   return (
     <div className="page-shell page-shell--profile">
       {pocClient ? (
@@ -379,6 +422,9 @@ export default async function CompanyProfilePage({
           </div>
           <div className="flex flex-col gap-4">
             {healthIndex && <HealthIndexCard data={healthIndex} />}
+            {pocClient && (
+              <ClientOpportunitiesPanel opportunities={activeOpportunities} />
+            )}
             <InteractionTimeline interactions={timelineRows} companyId={companyId} />
             <HistoricalComparisonCard />
           </div>
@@ -562,26 +608,42 @@ export default async function CompanyProfilePage({
           </div>
 
           <div className="hidden group-has-[#tab-upsells:checked]/tabs:block">
-            <p className="mb-3 text-xs text-ink-faint">
-              Preview layout -- upsell tracking isn&apos;t wired up for this view yet.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              {UPSELL_PREVIEW.map((u) => (
-                <div
-                  key={u.title}
-                  className="flex w-48 flex-col gap-2 glass-panel rounded-[var(--radius-md)] p-3"
-                >
-                  <span className="text-[10px] font-medium tracking-wide text-ink-faint uppercase">
-                    {u.stage}
-                  </span>
-                  <p className="text-sm font-medium text-ink">{u.title}</p>
-                  <p className="text-xs text-ink-muted">{company.name}</p>
-                  <p className="tabular text-sm font-semibold text-accent-emerald">
-                    ${u.value}/mo
-                  </p>
-                </div>
-              ))}
-            </div>
+            {loggedUpsells.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 glass-panel border-dashed border-white/15 rounded-[var(--radius-lg)] py-16 text-center">
+                <p className="text-sm font-medium text-ink">No confirmed upsells yet</p>
+                <p className="max-w-sm text-sm text-ink-muted">
+                  Pipeline wins and direct log-upsell actions appear here once
+                  payment is confirmed.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                {loggedUpsells.map((u) => (
+                  <div
+                    key={u.id}
+                    className="flex w-48 flex-col gap-2 glass-panel rounded-[var(--radius-md)] p-3"
+                  >
+                    <span className="text-[10px] font-medium tracking-wide text-ink-faint uppercase">
+                      Confirmed
+                    </span>
+                    <p className="text-sm font-medium text-ink">
+                      {UPSELL_TYPE_LABELS[u.upsell_type]}
+                      {u.upsell_type === "add_cc_seat" && u.quantity > 1
+                        ? ` ×${u.quantity}`
+                        : ""}
+                    </p>
+                    <p className="text-xs text-ink-muted">{company.name}</p>
+                    <p className="tabular text-sm font-semibold text-accent-emerald">
+                      $
+                      {(
+                        u.total_amount ??
+                        UPSELL_UNIT_AMOUNTS[u.upsell_type] * u.quantity
+                      ).toLocaleString("en-US")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="hidden group-has-[#tab-commission:checked]/tabs:block">

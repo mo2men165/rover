@@ -125,6 +125,14 @@ export const UPSELL_TYPE_LABELS: Record<Enums["upsell_type"], string> = {
   texting_package_upgrade: "Texting Package Upgrade",
 };
 
+export const UPSELL_STAGE_LABELS: Record<Enums["upsell_stage"], string> = {
+  opportunity: "Opportunity",
+  pitched: "Pitched",
+  pending: "Pending",
+  won: "Won",
+  lost: "Lost",
+};
+
 // Fixed, non-editable unit price per upsell_type — mirrors the DB trigger
 // (set_upsell_unit_amount) so the UI can preview totals before submit.
 export const UPSELL_UNIT_AMOUNTS: Record<Enums["upsell_type"], number> = {
