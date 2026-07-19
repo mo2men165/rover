@@ -99,14 +99,28 @@ const EMPTY_ASSOCIATE: AssociateDraft = {
 const nativeSelectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
+type ReferralPitchOption = {
+  id: string;
+  label: string;
+};
+
+type ClientOption = {
+  id: string;
+  label: string;
+};
+
 export function AddClientWizard({
   csrs,
   callerRole,
   callerId,
+  openPitches = [],
+  referringClients = [],
 }: {
   csrs: Csr[];
   callerRole: Role;
   callerId: string;
+  openPitches?: ReferralPitchOption[];
+  referringClients?: ClientOption[];
 }) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -144,6 +158,10 @@ export function AddClientWizard({
   const [packageTier, setPackageTier] = useState<PackageTier>("starter");
   const [packageStartDate, setPackageStartDate] = useState("");
   const [packagePriceOverride, setPackagePriceOverride] = useState("");
+
+  const [wasReferred, setWasReferred] = useState(false);
+  const [referralId, setReferralId] = useState("");
+  const [referredByClientId, setReferredByClientId] = useState("");
 
   useEffect(() => {
     if (containerRef.current) staggerIn([containerRef.current]);
@@ -259,6 +277,11 @@ export function AddClientWizard({
           : dataPackageMode === "legacy"
             ? { mode: "legacy" }
             : { mode: "self_provided" },
+      referralId: wasReferred && referralId ? referralId : undefined,
+      referredByClientId:
+        wasReferred && !referralId && referredByClientId
+          ? referredByClientId
+          : undefined,
     });
 
     setSubmitting(false);
@@ -414,6 +437,69 @@ export function AddClientWizard({
                     </option>
                   ))}
                 </select>
+              )}
+            </div>
+            <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={wasReferred}
+                  onChange={(e) => {
+                    setWasReferred(e.target.checked);
+                    if (!e.target.checked) {
+                      setReferralId("");
+                      setReferredByClientId("");
+                    }
+                  }}
+                  className="size-4 rounded border-white/20"
+                />
+                Referred by an existing client?
+              </label>
+              {wasReferred && (
+                <div className="flex flex-col gap-3">
+                  {openPitches.length > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="open-pitch">Link open pitch (optional)</Label>
+                      <select
+                        id="open-pitch"
+                        value={referralId}
+                        onChange={(e) => {
+                          setReferralId(e.target.value);
+                          if (e.target.value) setReferredByClientId("");
+                        }}
+                        className={nativeSelectClass}
+                      >
+                        <option value="">Create from referring client…</option>
+                        {openPitches.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {!referralId && (
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="referred-by">Referring client</Label>
+                      <select
+                        id="referred-by"
+                        required={wasReferred}
+                        value={referredByClientId}
+                        onChange={(e) => setReferredByClientId(e.target.value)}
+                        className={nativeSelectClass}
+                      >
+                        <option value="" disabled>
+                          Select referring client…
+                        </option>
+                        {referringClients.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>

@@ -43,6 +43,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   csr: csrNav,
   tl: csrNav,
   hod: csrNav,
-  admin: [dashboard, clients, admin],
-  sysadmin: [dashboard, clients, admin],
+  admin: [dashboard, clients, stoplightReport, admin],
+  sysadmin: [dashboard, clients, stoplightReport, admin],
 };

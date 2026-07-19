@@ -36,6 +36,10 @@ type CreateClientInput = {
   script: ClientScript;
   services: ServiceInput[];
   dataPackage: DataPackageInput;
+  /** Open referral pitch to convert when this client is onboarded. */
+  referralId?: string;
+  /** Referring existing client — creates+converts a referral if no pitch id. */
+  referredByClientId?: string;
 };
 
 type CreateClientResult =
@@ -163,6 +167,100 @@ export async function createClientRecord(
     )
   );
   if (servicesError) return { success: false, error: servicesError.message };
+
+  // Referral conversion: link an open pitch, or create a converted row from
+  // the referring client selected in the Add Client wizard.
+  if (input.referralId || input.referredByClientId) {
+    const now = new Date().toISOString();
+
+    if (input.referralId) {
+      const { data: pitch } = await admin
+        .from("referrals")
+        .select("id, csr_id, status")
+        .eq("id", input.referralId)
+        .maybeSingle();
+
+      if (!pitch || pitch.status !== "pitched") {
+        return { success: false, error: "Open referral pitch not found." };
+      }
+      if (pitch.csr_id !== assignedCsrId && role === "csr") {
+        return { success: false, error: "That pitch belongs to another CSR." };
+      }
+      if (role === "csr" && pitch.csr_id !== user.id) {
+        return { success: false, error: "You can only convert your own pitches." };
+      }
+
+      const { data: updated, error: refError } = await admin
+        .from("referrals")
+        .update({
+          status: "converted",
+          referred_client_id: pocClient.id,
+          converted_at: now,
+        })
+        .eq("id", input.referralId)
+        .eq("status", "pitched")
+        .select("id")
+        .maybeSingle();
+
+      if (refError) return { success: false, error: refError.message };
+      if (!updated) return { success: false, error: "Failed to convert referral pitch." };
+    } else if (input.referredByClientId) {
+      const { data: referring } = await admin
+        .from("clients")
+        .select("id, company_id")
+        .eq("id", input.referredByClientId)
+        .maybeSingle();
+      if (!referring) {
+        return { success: false, error: "Referring client not found." };
+      }
+
+      const { data: referringPoc } = await admin
+        .from("clients")
+        .select("assigned_csr_id")
+        .eq("company_id", referring.company_id)
+        .eq("is_poc", true)
+        .maybeSingle();
+
+      if (role === "csr" && referringPoc?.assigned_csr_id !== user.id) {
+        return { success: false, error: "Referring client isn't on your book." };
+      }
+
+      // Prefer converting an existing open pitch for this referrer + CSR.
+      const { data: existingPitch } = await admin
+        .from("referrals")
+        .select("id")
+        .eq("csr_id", assignedCsrId)
+        .eq("referring_client_id", input.referredByClientId)
+        .eq("status", "pitched")
+        .maybeSingle();
+
+      if (existingPitch) {
+        const { data: updated, error: refError } = await admin
+          .from("referrals")
+          .update({
+            status: "converted",
+            referred_client_id: pocClient.id,
+            converted_at: now,
+          })
+          .eq("id", existingPitch.id)
+          .eq("status", "pitched")
+          .select("id")
+          .maybeSingle();
+        if (refError) return { success: false, error: refError.message };
+        if (!updated) return { success: false, error: "Failed to convert existing pitch." };
+      } else {
+        const { error: refError } = await admin.from("referrals").insert({
+          referring_client_id: input.referredByClientId,
+          referred_client_id: pocClient.id,
+          csr_id: assignedCsrId,
+          status: "converted",
+          pitched_at: now,
+          converted_at: now,
+        });
+        if (refError) return { success: false, error: refError.message };
+      }
+    }
+  }
 
   return { success: true, companyId: company.id };
 }

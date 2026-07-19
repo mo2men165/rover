@@ -55,6 +55,53 @@ export type Database = {
           },
         ]
       }
+      churn_records: {
+        Row: {
+          churn_type: Database["public"]["Enums"]["churn_type"]
+          client_id: string
+          created_at: string
+          deposit_status: Database["public"]["Enums"]["deposit_status"] | null
+          flagged_at: string
+          id: string
+          reason: string | null
+          resolved_at: string | null
+          risk_score: number | null
+          signals: Json
+        }
+        Insert: {
+          churn_type: Database["public"]["Enums"]["churn_type"]
+          client_id: string
+          created_at?: string
+          deposit_status?: Database["public"]["Enums"]["deposit_status"] | null
+          flagged_at?: string
+          id?: string
+          reason?: string | null
+          resolved_at?: string | null
+          risk_score?: number | null
+          signals?: Json
+        }
+        Update: {
+          churn_type?: Database["public"]["Enums"]["churn_type"]
+          client_id?: string
+          created_at?: string
+          deposit_status?: Database["public"]["Enums"]["deposit_status"] | null
+          flagged_at?: string
+          id?: string
+          reason?: string | null
+          resolved_at?: string | null
+          risk_score?: number | null
+          signals?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "churn_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           assigned_csr_id: string | null
@@ -191,53 +238,6 @@ export type Database = {
         }
         Relationships: []
       }
-      churn_records: {
-        Row: {
-          churn_type: Database["public"]["Enums"]["churn_type"]
-          client_id: string
-          created_at: string
-          deposit_status: Database["public"]["Enums"]["deposit_status"] | null
-          flagged_at: string
-          id: string
-          reason: string | null
-          resolved_at: string | null
-          risk_score: number | null
-          signals: Json
-        }
-        Insert: {
-          churn_type: Database["public"]["Enums"]["churn_type"]
-          client_id: string
-          created_at?: string
-          deposit_status?: Database["public"]["Enums"]["deposit_status"] | null
-          flagged_at?: string
-          id?: string
-          reason?: string | null
-          resolved_at?: string | null
-          risk_score?: number | null
-          signals?: Json
-        }
-        Update: {
-          churn_type?: Database["public"]["Enums"]["churn_type"]
-          client_id?: string
-          created_at?: string
-          deposit_status?: Database["public"]["Enums"]["deposit_status"] | null
-          flagged_at?: string
-          id?: string
-          reason?: string | null
-          resolved_at?: string | null
-          risk_score?: number | null
-          signals?: Json
-        }
-        Relationships: [
-          {
-            foreignKeyName: "churn_records_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       complaints: {
         Row: {
           category: string
@@ -295,50 +295,34 @@ export type Database = {
           },
         ]
       }
-      follow_up_tasks: {
+      csr_quotas: {
         Row: {
-          assigned_to: string
-          complaint_id: string | null
-          completed: boolean
-          completed_at: string | null
           created_at: string
-          description: string
-          due_date: string
+          csr_id: string
           id: string
+          quarter: string
+          records_target: number
         }
         Insert: {
-          assigned_to: string
-          complaint_id?: string | null
-          completed?: boolean
-          completed_at?: string | null
           created_at?: string
-          description: string
-          due_date: string
+          csr_id: string
           id?: string
+          quarter: string
+          records_target: number
         }
         Update: {
-          assigned_to?: string
-          complaint_id?: string | null
-          completed?: boolean
-          completed_at?: string | null
           created_at?: string
-          description?: string
-          due_date?: string
+          csr_id?: string
           id?: string
+          quarter?: string
+          records_target?: number
         }
         Relationships: [
           {
-            foreignKeyName: "follow_up_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
+            foreignKeyName: "csr_quotas_csr_id_fkey"
+            columns: ["csr_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "follow_up_tasks_complaint_id_fkey"
-            columns: ["complaint_id"]
-            isOneToOne: false
-            referencedRelation: "complaints"
             referencedColumns: ["id"]
           },
         ]
@@ -373,101 +357,44 @@ export type Database = {
           },
         ]
       }
-      interactions: {
+      data_lists: {
         Row: {
-          client_id: string
           created_at: string
-          direction: Database["public"]["Enums"]["interaction_direction"]
-          external_id: string | null
-          hubspot_sync_note: string | null
-          hubspot_synced: boolean
+          duplicates: number
+          entered_by: string
           id: string
-          logged_by: string
-          occurred_at: string
-          source: Database["public"]["Enums"]["interaction_source"]
-          summary: string
-          type: Database["public"]["Enums"]["interaction_type"]
+          list_date: string
+          records_accepted: number
+          records_count: number
+          records_skip_traced: number | null
+          skip_trace_rate: number
         }
         Insert: {
-          client_id: string
           created_at?: string
-          direction: Database["public"]["Enums"]["interaction_direction"]
-          external_id?: string | null
-          hubspot_sync_note?: string | null
-          hubspot_synced?: boolean
+          duplicates: number
+          entered_by: string
           id?: string
-          logged_by: string
-          occurred_at?: string
-          source?: Database["public"]["Enums"]["interaction_source"]
-          summary: string
-          type: Database["public"]["Enums"]["interaction_type"]
+          list_date: string
+          records_accepted: number
+          records_count: number
+          records_skip_traced?: number | null
+          skip_trace_rate?: number
         }
         Update: {
-          client_id?: string
           created_at?: string
-          direction?: Database["public"]["Enums"]["interaction_direction"]
-          external_id?: string | null
-          hubspot_sync_note?: string | null
-          hubspot_synced?: boolean
+          duplicates?: number
+          entered_by?: string
           id?: string
-          logged_by?: string
-          occurred_at?: string
-          source?: Database["public"]["Enums"]["interaction_source"]
-          summary?: string
-          type?: Database["public"]["Enums"]["interaction_type"]
+          list_date?: string
+          records_accepted?: number
+          records_count?: number
+          records_skip_traced?: number | null
+          skip_trace_rate?: number
         }
         Relationships: [
           {
-            foreignKeyName: "interactions_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "interactions_logged_by_fkey"
-            columns: ["logged_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      notifications: {
-        Row: {
-          body: string
-          created_at: string
-          dismissed_at: string | null
-          id: string
-          kind: Database["public"]["Enums"]["notification_kind"]
-          payload: Json | null
-          title: string
-          user_id: string
-        }
-        Insert: {
-          body: string
-          created_at?: string
-          dismissed_at?: string | null
-          id?: string
-          kind: Database["public"]["Enums"]["notification_kind"]
-          payload?: Json | null
-          title: string
-          user_id: string
-        }
-        Update: {
-          body?: string
-          created_at?: string
-          dismissed_at?: string | null
-          id?: string
-          kind?: Database["public"]["Enums"]["notification_kind"]
-          payload?: Json | null
-          title?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "data_lists_entered_by_fkey"
+            columns: ["entered_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -508,6 +435,60 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_messages: {
+        Row: {
+          body_text: string | null
+          created_at: string
+          direction: Database["public"]["Enums"]["interaction_direction"] | null
+          from_address: string | null
+          gmail_message_id: string
+          id: string
+          sent_at: string | null
+          snippet: string | null
+          subject: string | null
+          thread_id: string
+          to_addresses: string[] | null
+        }
+        Insert: {
+          body_text?: string | null
+          created_at?: string
+          direction?:
+            | Database["public"]["Enums"]["interaction_direction"]
+            | null
+          from_address?: string | null
+          gmail_message_id: string
+          id?: string
+          sent_at?: string | null
+          snippet?: string | null
+          subject?: string | null
+          thread_id: string
+          to_addresses?: string[] | null
+        }
+        Update: {
+          body_text?: string | null
+          created_at?: string
+          direction?:
+            | Database["public"]["Enums"]["interaction_direction"]
+            | null
+          from_address?: string | null
+          gmail_message_id?: string
+          id?: string
+          sent_at?: string | null
+          snippet?: string | null
+          subject?: string | null
+          thread_id?: string
+          to_addresses?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "email_threads"
             referencedColumns: ["id"]
           },
         ]
@@ -596,98 +577,108 @@ export type Database = {
           },
         ]
       }
-      email_messages: {
+      follow_up_tasks: {
         Row: {
-          body_text: string | null
+          assigned_to: string
+          complaint_id: string | null
+          completed: boolean
+          completed_at: string | null
           created_at: string
-          direction: Database["public"]["Enums"]["interaction_direction"] | null
-          from_address: string | null
-          gmail_message_id: string
+          description: string
+          due_date: string
           id: string
-          sent_at: string | null
-          snippet: string | null
-          subject: string | null
-          thread_id: string
-          to_addresses: string[] | null
         }
         Insert: {
-          body_text?: string | null
+          assigned_to: string
+          complaint_id?: string | null
+          completed?: boolean
+          completed_at?: string | null
           created_at?: string
-          direction?:
-            | Database["public"]["Enums"]["interaction_direction"]
-            | null
-          from_address?: string | null
-          gmail_message_id: string
+          description: string
+          due_date: string
           id?: string
-          sent_at?: string | null
-          snippet?: string | null
-          subject?: string | null
-          thread_id: string
-          to_addresses?: string[] | null
         }
         Update: {
-          body_text?: string | null
+          assigned_to?: string
+          complaint_id?: string | null
+          completed?: boolean
+          completed_at?: string | null
           created_at?: string
-          direction?:
-            | Database["public"]["Enums"]["interaction_direction"]
-            | null
-          from_address?: string | null
-          gmail_message_id?: string
+          description?: string
+          due_date?: string
           id?: string
-          sent_at?: string | null
-          snippet?: string | null
-          subject?: string | null
-          thread_id?: string
-          to_addresses?: string[] | null
         }
         Relationships: [
           {
-            foreignKeyName: "email_messages_thread_id_fkey"
-            columns: ["thread_id"]
+            foreignKeyName: "follow_up_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
             isOneToOne: false
-            referencedRelation: "email_threads"
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_complaint_id_fkey"
+            columns: ["complaint_id"]
+            isOneToOne: false
+            referencedRelation: "complaints"
             referencedColumns: ["id"]
           },
         ]
       }
-      data_lists: {
+      interactions: {
         Row: {
+          client_id: string
           created_at: string
-          duplicates: number
-          entered_by: string
+          direction: Database["public"]["Enums"]["interaction_direction"]
+          external_id: string | null
+          hubspot_sync_note: string | null
+          hubspot_synced: boolean
           id: string
-          list_date: string
-          records_accepted: number
-          records_count: number
-          records_skip_traced: number | null
-          skip_trace_rate: number
+          logged_by: string
+          occurred_at: string
+          source: Database["public"]["Enums"]["interaction_source"]
+          summary: string
+          type: Database["public"]["Enums"]["interaction_type"]
         }
         Insert: {
+          client_id: string
           created_at?: string
-          duplicates: number
-          entered_by: string
+          direction: Database["public"]["Enums"]["interaction_direction"]
+          external_id?: string | null
+          hubspot_sync_note?: string | null
+          hubspot_synced?: boolean
           id?: string
-          list_date: string
-          records_accepted: number
-          records_count: number
-          records_skip_traced?: number | null
-          skip_trace_rate?: number
+          logged_by: string
+          occurred_at?: string
+          source?: Database["public"]["Enums"]["interaction_source"]
+          summary: string
+          type: Database["public"]["Enums"]["interaction_type"]
         }
         Update: {
+          client_id?: string
           created_at?: string
-          duplicates?: number
-          entered_by?: string
+          direction?: Database["public"]["Enums"]["interaction_direction"]
+          external_id?: string | null
+          hubspot_sync_note?: string | null
+          hubspot_synced?: boolean
           id?: string
-          list_date?: string
-          records_accepted?: number
-          records_count?: number
-          records_skip_traced?: number | null
-          skip_trace_rate?: number
+          logged_by?: string
+          occurred_at?: string
+          source?: Database["public"]["Enums"]["interaction_source"]
+          summary?: string
+          type?: Database["public"]["Enums"]["interaction_type"]
         }
         Relationships: [
           {
-            foreignKeyName: "data_lists_entered_by_fkey"
-            columns: ["entered_by"]
+            foreignKeyName: "interactions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interactions_logged_by_fkey"
+            columns: ["logged_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -730,6 +721,47 @@ export type Database = {
           {
             foreignKeyName: "monthly_payment_confirmations_confirmed_by_fkey"
             columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          body: string
+          created_at: string
+          dismissed_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          payload: Json | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          payload?: Json | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["notification_kind"]
+          payload?: Json | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -784,6 +816,109 @@ export type Database = {
           {
             foreignKeyName: "payg_requests_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrals: {
+        Row: {
+          converted_at: string | null
+          created_at: string
+          csr_id: string
+          id: string
+          notes: string | null
+          pitched_at: string
+          referred_client_id: string | null
+          referring_client_id: string | null
+          status: Database["public"]["Enums"]["referral_status"]
+        }
+        Insert: {
+          converted_at?: string | null
+          created_at?: string
+          csr_id: string
+          id?: string
+          notes?: string | null
+          pitched_at?: string
+          referred_client_id?: string | null
+          referring_client_id?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+        }
+        Update: {
+          converted_at?: string | null
+          created_at?: string
+          csr_id?: string
+          id?: string
+          notes?: string | null
+          pitched_at?: string
+          referred_client_id?: string | null
+          referring_client_id?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_csr_id_fkey"
+            columns: ["csr_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referred_client_id_fkey"
+            columns: ["referred_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referring_client_id_fkey"
+            columns: ["referring_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stoplight_week_reviews: {
+        Row: {
+          confirmed_at: string
+          confirmed_by: string
+          created_at: string
+          csr_id: string
+          id: string
+          notes: string | null
+          week_start: string
+        }
+        Insert: {
+          confirmed_at?: string
+          confirmed_by: string
+          created_at?: string
+          csr_id: string
+          id?: string
+          notes?: string | null
+          week_start: string
+        }
+        Update: {
+          confirmed_at?: string
+          confirmed_by?: string
+          created_at?: string
+          csr_id?: string
+          id?: string
+          notes?: string | null
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stoplight_week_reviews_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stoplight_week_reviews_csr_id_fkey"
+            columns: ["csr_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -928,7 +1063,7 @@ export type Database = {
           {
             foreignKeyName: "upsells_upsell_opportunity_id_fkey"
             columns: ["upsell_opportunity_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "upsell_opportunities"
             referencedColumns: ["id"]
           },
@@ -1016,6 +1151,7 @@ export type Database = {
       package_tier: "starter" | "pro" | "growth"
       provider_type: "res" | "self_provided"
       rate_type: "standard" | "promo"
+      referral_status: "pitched" | "converted"
       skip_trace_rate_tier: "0.09" | "0.07" | "0.0525" | "custom"
       texting_tier: "50k" | "75k" | "100k"
       upsell_stage: "opportunity" | "pitched" | "pending" | "won" | "lost"
@@ -1178,6 +1314,7 @@ export const Constants = {
       package_tier: ["starter", "pro", "growth"],
       provider_type: ["res", "self_provided"],
       rate_type: ["standard", "promo"],
+      referral_status: ["pitched", "converted"],
       skip_trace_rate_tier: ["0.09", "0.07", "0.0525", "custom"],
       texting_tier: ["50k", "75k", "100k"],
       upsell_stage: ["opportunity", "pitched", "pending", "won", "lost"],
