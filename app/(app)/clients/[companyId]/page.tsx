@@ -26,6 +26,12 @@ import { ScriptCard } from "@/components/clients/script-card";
 import { PinnedNotesCard } from "@/components/clients/pinned-notes-card";
 import { AssociatesCard } from "@/components/clients/associates-card";
 import { InteractionTimeline } from "@/components/interactions/interaction-timeline";
+import {
+  HealthIndexCard,
+  type HealthIndexData,
+} from "@/components/churn/health-index-card";
+import { computeAndPersistChurnScore } from "@/lib/churn/compute";
+import { SIGNAL_META, type SignalKey } from "@/lib/churn/score";
 import { toBuyBox } from "@/lib/supabase/buy-box-options";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -51,64 +57,9 @@ function TypeIndicator({ type }: { type: CampaignType }) {
 }
 
 // ---------------------------------------------------------------------
-// Right-column Health Index / Historical panels below are visual stubs
-// with representative static numbers -- there's no health-scoring or
-// historical-snapshot data model in the schema yet. Interaction Timeline
-// is live (Part 2).
+// Historical panel remains a visual stub. Churn Risk (ex-Health Index)
+// is live via the 5-signal scorer (Part 3).
 // ---------------------------------------------------------------------
-
-const HEALTH_BAND = {
-  emerald: { text: "text-accent-emerald", bar: "bg-accent-emerald" },
-  amber: { text: "text-accent-amber", bar: "bg-accent-amber" },
-  coral: { text: "text-accent-coral", bar: "bg-accent-coral" },
-} as const;
-
-const HEALTH_INDEX_STUB = {
-  score: 87,
-  band: "emerald" as keyof typeof HEALTH_BAND,
-  factors: [
-    { label: "Response rate", value: "92%", pct: 92, band: "emerald" as const },
-    { label: "Payment timeliness", value: "On time", pct: 88, band: "emerald" as const },
-    { label: "Engagement frequency", value: "3.2 calls/wk", pct: 76, band: "amber" as const },
-    { label: "Escalations (90d)", value: "1", pct: 35, band: "coral" as const },
-  ],
-};
-
-function HealthIndexCard() {
-  const { score, band, factors } = HEALTH_INDEX_STUB;
-  return (
-    <div className="flex flex-col gap-4 glass-panel rounded-[var(--radius-lg)] p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="font-heading text-sm font-medium uppercase tracking-wide text-ink-muted">
-          Health Index
-        </h2>
-        <span className={`font-heading text-2xl font-bold tabular ${HEALTH_BAND[band].text}`}>
-          {score}
-          <span className="text-sm font-normal text-ink-muted">/100</span>
-        </span>
-      </div>
-      <div className="flex flex-col gap-3">
-        {factors.map((f) => (
-          <div key={f.label} className="flex flex-col gap-1">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-ink-muted">{f.label}</span>
-              <span className="tabular text-ink">{f.value}</span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
-              <div
-                className={`h-full rounded-full ${HEALTH_BAND[f.band].bar}`}
-                style={{ width: `${f.pct}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-      <p className="text-xs text-ink-faint">
-        Illustrative -- health scoring isn&apos;t wired up for this client yet.
-      </p>
-    </div>
-  );
-}
 
 const HISTORICAL_STUB = [
   { label: "Response Rate", value: "92%", delta: "+8%", positive: true },
@@ -329,6 +280,56 @@ export default async function CompanyProfilePage({
     });
   }
 
+  let healthIndex: HealthIndexData | null = null;
+  if (pocClient) {
+    let scoreResult = null;
+    try {
+      scoreResult = await computeAndPersistChurnScore(pocClient.id);
+    } catch {
+      scoreResult = null;
+    }
+
+    const { data: churnRow } = await supabase
+      .from("churn_records")
+      .select("churn_type, reason, deposit_status, risk_score, signals")
+      .eq("client_id", pocClient.id)
+      .is("resolved_at", null)
+      .maybeSingle();
+
+    const flagged = Boolean(
+      churnRow &&
+        (churnRow.reason != null ||
+          churnRow.deposit_status != null ||
+          churnRow.churn_type === "known")
+    );
+
+    const signalOrder = Object.keys(SIGNAL_META) as SignalKey[];
+    const fromScore = scoreResult?.signals ?? [];
+    const signals =
+      fromScore.length > 0
+        ? fromScore.map((s) => ({
+            key: s.key,
+            label: s.label,
+            value: s.score ?? 0,
+            available: s.available,
+          }))
+        : signalOrder.map((key) => ({
+            key,
+            label: SIGNAL_META[key].label,
+            value: 0,
+            available: false,
+          }));
+
+    healthIndex = {
+      clientId: pocClient.id,
+      riskScore: scoreResult?.riskScore ?? churnRow?.risk_score ?? null,
+      computedAt: scoreResult?.computedAt ?? null,
+      signals,
+      flagged,
+      churnType: flagged ? (churnRow?.churn_type ?? null) : null,
+    };
+  }
+
   return (
     <div className="page-shell page-shell--profile">
       {pocClient ? (
@@ -377,7 +378,7 @@ export default async function CompanyProfilePage({
             />
           </div>
           <div className="flex flex-col gap-4">
-            <HealthIndexCard />
+            {healthIndex && <HealthIndexCard data={healthIndex} />}
             <InteractionTimeline interactions={timelineRows} companyId={companyId} />
             <HistoricalComparisonCard />
           </div>

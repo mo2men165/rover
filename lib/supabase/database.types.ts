@@ -191,6 +191,158 @@ export type Database = {
         }
         Relationships: []
       }
+      churn_records: {
+        Row: {
+          churn_type: Database["public"]["Enums"]["churn_type"]
+          client_id: string
+          created_at: string
+          deposit_status: Database["public"]["Enums"]["deposit_status"] | null
+          flagged_at: string
+          id: string
+          reason: string | null
+          resolved_at: string | null
+          risk_score: number | null
+          signals: Json
+        }
+        Insert: {
+          churn_type: Database["public"]["Enums"]["churn_type"]
+          client_id: string
+          created_at?: string
+          deposit_status?: Database["public"]["Enums"]["deposit_status"] | null
+          flagged_at?: string
+          id?: string
+          reason?: string | null
+          resolved_at?: string | null
+          risk_score?: number | null
+          signals?: Json
+        }
+        Update: {
+          churn_type?: Database["public"]["Enums"]["churn_type"]
+          client_id?: string
+          created_at?: string
+          deposit_status?: Database["public"]["Enums"]["deposit_status"] | null
+          flagged_at?: string
+          id?: string
+          reason?: string | null
+          resolved_at?: string | null
+          risk_score?: number | null
+          signals?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "churn_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      complaints: {
+        Row: {
+          category: string
+          client_id: string
+          created_at: string
+          description: string
+          id: string
+          logged_by: string
+          opened_at: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["complaint_status"]
+          validity: Database["public"]["Enums"]["complaint_validity"]
+        }
+        Insert: {
+          category: string
+          client_id: string
+          created_at?: string
+          description: string
+          id?: string
+          logged_by: string
+          opened_at?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["complaint_status"]
+          validity: Database["public"]["Enums"]["complaint_validity"]
+        }
+        Update: {
+          category?: string
+          client_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          logged_by?: string
+          opened_at?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["complaint_status"]
+          validity?: Database["public"]["Enums"]["complaint_validity"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "complaints_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "complaints_logged_by_fkey"
+            columns: ["logged_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      follow_up_tasks: {
+        Row: {
+          assigned_to: string
+          complaint_id: string | null
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          description: string
+          due_date: string
+          id: string
+        }
+        Insert: {
+          assigned_to: string
+          complaint_id?: string | null
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          description: string
+          due_date: string
+          id?: string
+        }
+        Update: {
+          assigned_to?: string
+          complaint_id?: string | null
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          description?: string
+          due_date?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_tasks_complaint_id_fkey"
+            columns: ["complaint_id"]
+            isOneToOne: false
+            referencedRelation: "complaints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_list_services: {
         Row: {
           campaign_service_id: string
@@ -775,9 +927,13 @@ export type Database = {
     }
     Enums: {
       campaign_type: "cold_calling" | "texting"
+      churn_type: "known" | "unknown"
       client_script: "four_pillars" | "motivation_only"
+      complaint_status: "open" | "resolved"
+      complaint_validity: "valid" | "invalid"
       contact_method: "email" | "phone" | "text"
       data_source_tier: "package" | "payg" | "legacy"
+      deposit_status: "keep" | "use" | "refund"
       email_thread_status: "open" | "done" | "ignored"
       interaction_direction: "inbound" | "outbound" | "internal"
       interaction_source: "manual" | "gmail" | "fathom" | "hubspot_sync"
@@ -931,9 +1087,26 @@ export const Constants = {
   public: {
     Enums: {
       campaign_type: ["cold_calling", "texting"],
+      churn_type: ["known", "unknown"],
       client_script: ["four_pillars", "motivation_only"],
+      complaint_status: ["open", "resolved"],
+      complaint_validity: ["valid", "invalid"],
       contact_method: ["email", "phone", "text"],
       data_source_tier: ["package", "payg", "legacy"],
+      deposit_status: ["keep", "use", "refund"],
+      email_thread_status: ["open", "done", "ignored"],
+      interaction_direction: ["inbound", "outbound", "internal"],
+      interaction_source: ["manual", "gmail", "fathom", "hubspot_sync"],
+      interaction_type: [
+        "email",
+        "call",
+        "sms",
+        "whatsapp",
+        "slack",
+        "meeting",
+        "note",
+      ],
+      notification_kind: ["eod_no_interaction", "open_email_threads"],
       package_tier: ["starter", "pro", "growth"],
       provider_type: ["res", "self_provided"],
       rate_type: ["standard", "promo"],

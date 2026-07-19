@@ -78,11 +78,37 @@ export default async function ClientsPage() {
   const { data: pocClients } = companyIds.length
     ? await supabase
         .from("clients")
-        .select("company_id, data_source_type, data_source_tier, package_price")
+        .select("id, company_id, data_source_type, data_source_tier, package_price")
         .eq("is_poc", true)
         .in("company_id", companyIds)
     : { data: [] };
   const configByCompany = new Map((pocClients ?? []).map((c) => [c.company_id, c]));
+
+  // Operator-flagged churn markers for the clients list (not auto-monitor-only).
+  const { data: activeChurn } = (pocClients ?? []).length
+    ? await supabase
+        .from("churn_records")
+        .select("client_id, churn_type, reason, deposit_status")
+        .is("resolved_at", null)
+        .in(
+          "client_id",
+          (pocClients ?? []).map((p) => p.id)
+        )
+    : { data: [] };
+
+  const flaggedClientIds = new Set(
+    (activeChurn ?? [])
+      .filter(
+        (r) =>
+          r.reason != null || r.deposit_status != null || r.churn_type === "known"
+      )
+      .map((r) => r.client_id)
+  );
+  const churnCompanyIds = new Set(
+    (pocClients ?? [])
+      .filter((p) => flaggedClientIds.has(p.id))
+      .map((p) => p.company_id)
+  );
 
   const coldCount = rows.filter((r) => r.type === "cold_calling").length;
   const textingCount = rows.length - coldCount;
@@ -232,8 +258,16 @@ export default async function ClientsPage() {
               rows.map((cs) => {
                 const config = configByCompany.get(cs.company.id);
                 const price = config?.package_price ?? null;
+                const isChurned = churnCompanyIds.has(cs.company.id);
                 return (
-                  <TableRow key={cs.id}>
+                  <TableRow
+                    key={cs.id}
+                    className={
+                      isChurned
+                        ? "bg-[oklch(64%_0.19_25/0.06)]"
+                        : undefined
+                    }
+                  >
                     <TableCell>
                       <Link
                         href={`/clients/${cs.company.id}`}
@@ -242,8 +276,15 @@ export default async function ClientsPage() {
                         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--brand-blue),var(--brand-blue-deep))] text-[10px] font-semibold text-white">
                           {initialsOf(cs.company.name)}
                         </span>
-                        <span className="font-medium text-ink group-hover:text-ledger group-hover:underline">
-                          {cs.company.name}
+                        <span className="flex flex-col">
+                          <span className="font-medium text-ink group-hover:text-ledger group-hover:underline">
+                            {cs.company.name}
+                          </span>
+                          {isChurned && (
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-accent-coral">
+                              Churn flagged
+                            </span>
+                          )}
                         </span>
                       </Link>
                     </TableCell>

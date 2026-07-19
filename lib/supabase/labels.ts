@@ -87,6 +87,36 @@ export const INTERACTION_SOURCE_LABELS: Record<Enums["interaction_source"], stri
   hubspot_sync: "HubSpot",
 };
 
+export const COMPLAINT_STATUS_LABELS: Record<Enums["complaint_status"], string> = {
+  open: "Open",
+  resolved: "Resolved",
+};
+
+export const COMPLAINT_VALIDITY_LABELS: Record<Enums["complaint_validity"], string> = {
+  valid: "Valid",
+  invalid: "Invalid",
+};
+
+/** Free-text categories offered in the log form (schema stores text). */
+export const COMPLAINT_CATEGORIES = [
+  "Billing",
+  "Data Quality",
+  "Onboarding",
+  "Communication",
+  "Other",
+] as const;
+
+export const CHURN_TYPE_LABELS: Record<Enums["churn_type"], string> = {
+  known: "Known",
+  unknown: "Unknown",
+};
+
+export const DEPOSIT_STATUS_LABELS: Record<Enums["deposit_status"], string> = {
+  keep: "Keep",
+  use: "Use",
+  refund: "Refund",
+};
+
 export const UPSELL_TYPE_LABELS: Record<Enums["upsell_type"], string> = {
   add_cc_seat: "Add CC Seat",
   add_texting_service: "Add Texting Service",
