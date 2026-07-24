@@ -22,6 +22,10 @@ export type Database = {
           name: string | null
           rate_type: Database["public"]["Enums"]["rate_type"] | null
           seat_count: number
+          service_start_date: string | null
+          texting_account_email: string | null
+          texting_account_name: string | null
+          texting_funnel: Database["public"]["Enums"]["texting_funnel"] | null
           texting_tier: Database["public"]["Enums"]["texting_tier"] | null
           type: Database["public"]["Enums"]["campaign_type"]
         }
@@ -32,6 +36,10 @@ export type Database = {
           name?: string | null
           rate_type?: Database["public"]["Enums"]["rate_type"] | null
           seat_count: number
+          service_start_date?: string | null
+          texting_account_email?: string | null
+          texting_account_name?: string | null
+          texting_funnel?: Database["public"]["Enums"]["texting_funnel"] | null
           texting_tier?: Database["public"]["Enums"]["texting_tier"] | null
           type: Database["public"]["Enums"]["campaign_type"]
         }
@@ -42,6 +50,10 @@ export type Database = {
           name?: string | null
           rate_type?: Database["public"]["Enums"]["rate_type"] | null
           seat_count?: number
+          service_start_date?: string | null
+          texting_account_email?: string | null
+          texting_account_name?: string | null
+          texting_funnel?: Database["public"]["Enums"]["texting_funnel"] | null
           texting_tier?: Database["public"]["Enums"]["texting_tier"] | null
           type?: Database["public"]["Enums"]["campaign_type"]
         }
@@ -108,6 +120,8 @@ export type Database = {
           buy_box: Json | null
           company_id: string
           created_at: string
+          custom_script_url: string | null
+          data_source_provider_name: string | null
           data_source_tier:
             | Database["public"]["Enums"]["data_source_tier"]
             | null
@@ -116,7 +130,13 @@ export type Database = {
           hs_object_id: string | null
           id: string
           is_poc: boolean
+          lead_source: string | null
+          lifecycle_stage: Database["public"]["Enums"]["lifecycle_stage"] | null
+          monthly_skip_trace_expected: number | null
           name: string
+          package_commitment:
+            | Database["public"]["Enums"]["package_commitment"]
+            | null
           package_end_date: string | null
           package_price: number | null
           package_start_date: string | null
@@ -128,6 +148,7 @@ export type Database = {
             | null
           role: string | null
           script: Database["public"]["Enums"]["client_script"] | null
+          skip_trace_provider_name: string | null
           skip_trace_rate: number | null
           skip_trace_rate_tier:
             | Database["public"]["Enums"]["skip_trace_rate_tier"]
@@ -140,6 +161,8 @@ export type Database = {
           buy_box?: Json | null
           company_id: string
           created_at?: string
+          custom_script_url?: string | null
+          data_source_provider_name?: string | null
           data_source_tier?:
             | Database["public"]["Enums"]["data_source_tier"]
             | null
@@ -148,7 +171,13 @@ export type Database = {
           hs_object_id?: string | null
           id?: string
           is_poc?: boolean
+          lead_source?: string | null
+          lifecycle_stage?: Database["public"]["Enums"]["lifecycle_stage"] | null
+          monthly_skip_trace_expected?: number | null
           name: string
+          package_commitment?:
+            | Database["public"]["Enums"]["package_commitment"]
+            | null
           package_end_date?: string | null
           package_price?: number | null
           package_start_date?: string | null
@@ -160,6 +189,7 @@ export type Database = {
             | null
           role?: string | null
           script?: Database["public"]["Enums"]["client_script"] | null
+          skip_trace_provider_name?: string | null
           skip_trace_rate?: number | null
           skip_trace_rate_tier?:
             | Database["public"]["Enums"]["skip_trace_rate_tier"]
@@ -174,6 +204,8 @@ export type Database = {
           buy_box?: Json | null
           company_id?: string
           created_at?: string
+          custom_script_url?: string | null
+          data_source_provider_name?: string | null
           data_source_tier?:
             | Database["public"]["Enums"]["data_source_tier"]
             | null
@@ -182,7 +214,13 @@ export type Database = {
           hs_object_id?: string | null
           id?: string
           is_poc?: boolean
+          lead_source?: string | null
+          lifecycle_stage?: Database["public"]["Enums"]["lifecycle_stage"] | null
+          monthly_skip_trace_expected?: number | null
           name?: string
+          package_commitment?:
+            | Database["public"]["Enums"]["package_commitment"]
+            | null
           package_end_date?: string | null
           package_price?: number | null
           package_start_date?: string | null
@@ -194,6 +232,7 @@ export type Database = {
             | null
           role?: string | null
           script?: Database["public"]["Enums"]["client_script"] | null
+          skip_trace_provider_name?: string | null
           skip_trace_rate?: number | null
           skip_trace_rate_tier?:
             | Database["public"]["Enums"]["skip_trace_rate_tier"]
@@ -1130,13 +1169,14 @@ export type Database = {
     Enums: {
       campaign_type: "cold_calling" | "texting"
       churn_type: "known" | "unknown"
-      client_script: "four_pillars" | "motivation_only"
+      client_script: "four_pillars" | "motivation_only" | "realtor" | "custom"
       complaint_status: "open" | "resolved"
       complaint_validity: "valid" | "invalid"
       contact_method: "email" | "phone" | "text"
       data_source_tier: "package" | "payg" | "legacy"
       deposit_status: "keep" | "use" | "refund"
       email_thread_status: "open" | "done" | "ignored"
+      lifecycle_stage: "in_operation" | "onboarding" | "churn"
       interaction_direction: "inbound" | "outbound" | "internal"
       interaction_source: "manual" | "gmail" | "fathom" | "hubspot_sync"
       interaction_type:
@@ -1148,11 +1188,13 @@ export type Database = {
         | "meeting"
         | "note"
       notification_kind: "eod_no_interaction" | "open_email_threads"
+      package_commitment: "three_month" | "six_month"
       package_tier: "starter" | "pro" | "growth"
       provider_type: "res" | "self_provided"
       rate_type: "standard" | "promo"
       referral_status: "pitched" | "converted"
       skip_trace_rate_tier: "0.09" | "0.07" | "0.0525" | "custom"
+      texting_funnel: "narrow" | "medium" | "wide"
       texting_tier: "50k" | "75k" | "100k"
       upsell_stage: "opportunity" | "pitched" | "pending" | "won" | "lost"
       upsell_type:
@@ -1292,13 +1334,14 @@ export const Constants = {
     Enums: {
       campaign_type: ["cold_calling", "texting"],
       churn_type: ["known", "unknown"],
-      client_script: ["four_pillars", "motivation_only"],
+      client_script: ["four_pillars", "motivation_only", "realtor", "custom"],
       complaint_status: ["open", "resolved"],
       complaint_validity: ["valid", "invalid"],
       contact_method: ["email", "phone", "text"],
       data_source_tier: ["package", "payg", "legacy"],
       deposit_status: ["keep", "use", "refund"],
       email_thread_status: ["open", "done", "ignored"],
+      lifecycle_stage: ["in_operation", "onboarding", "churn"],
       interaction_direction: ["inbound", "outbound", "internal"],
       interaction_source: ["manual", "gmail", "fathom", "hubspot_sync"],
       interaction_type: [
@@ -1311,11 +1354,13 @@ export const Constants = {
         "note",
       ],
       notification_kind: ["eod_no_interaction", "open_email_threads"],
+      package_commitment: ["three_month", "six_month"],
       package_tier: ["starter", "pro", "growth"],
       provider_type: ["res", "self_provided"],
       rate_type: ["standard", "promo"],
       referral_status: ["pitched", "converted"],
       skip_trace_rate_tier: ["0.09", "0.07", "0.0525", "custom"],
+      texting_funnel: ["narrow", "medium", "wide"],
       texting_tier: ["50k", "75k", "100k"],
       upsell_stage: ["opportunity", "pitched", "pending", "won", "lost"],
       upsell_type: [

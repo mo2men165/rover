@@ -4,30 +4,59 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Check } from "lucide-react";
+import {
+  Check,
+  Building2,
+  Users,
+  MapPinned,
+  PhoneCall,
+  MessageSquareText,
+  Database as DatabaseIcon,
+  ClipboardCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { ListSelect } from "@/components/ui/list-select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { MultiSelectPills } from "@/components/clients/multi-select-pills";
 import { TagInput } from "@/components/clients/tag-input";
 import { createClientRecord } from "@/lib/actions/create-client";
 import { staggerIn } from "@/lib/motion";
+import { cn } from "@/lib/utils";
+import { isValidUsPhone, toUsPhoneE164 } from "@/lib/phone/us";
+import { LEAD_SOURCE_OPTIONS } from "@/lib/clients/lead-sources";
 import {
   CLIENT_SCRIPT_LABELS,
   CONTACT_METHOD_LABELS,
+  LIFECYCLE_STAGE_LABELS,
+  PACKAGE_COMMITMENT_LABELS,
   PACKAGE_TIER_LABELS,
   PACKAGE_TIER_PRICES,
-  TEXTING_TIER_LABELS,
+  PACKAGE_TIER_RECORDS,
+  SKIP_TRACE_RATE_TIER_LABELS,
+  SKIP_TRACING_SOURCE_LABELS,
+  TEXTING_FUNNEL_LABELS,
+  TEXTING_PACKAGE_LABELS,
 } from "@/lib/supabase/labels";
-import { PROPERTY_TYPE_OPTIONS, US_STATE_OPTIONS } from "@/lib/supabase/buy-box-options";
+import {
+  PROPERTY_TYPE_OPTIONS,
+  US_STATE_OPTIONS,
+  deriveExclusions,
+} from "@/lib/supabase/buy-box-options";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Role } from "@/components/app-shell/role-context";
 
 type TextingTier = Database["public"]["Enums"]["texting_tier"];
+type TextingFunnel = Database["public"]["Enums"]["texting_funnel"];
 type PackageTier = Database["public"]["Enums"]["package_tier"];
+type PackageCommitment = Database["public"]["Enums"]["package_commitment"];
 type ClientScript = Database["public"]["Enums"]["client_script"];
 type ContactMethod = Database["public"]["Enums"]["contact_method"];
+type LifecycleStage = Database["public"]["Enums"]["lifecycle_stage"];
+type ProviderType = Database["public"]["Enums"]["provider_type"];
+type SkipTraceRateTier = Database["public"]["Enums"]["skip_trace_rate_tier"];
+type DataMode = "package" | "payg" | "legacy" | "self_provided";
 
 type Csr = { id: string; name: string };
 
@@ -37,56 +66,8 @@ type AssociateDraft = {
   phone: string;
   role: string;
   preferredContactMethod: ContactMethod | "";
+  hsObjectId: string;
 };
-
-type ServiceDraft =
-  | { type: "cold_calling"; seatCount: string }
-  | { type: "texting"; textingTier: TextingTier };
-
-const STEPS = [
-  {
-    key: "company",
-    label: "Company & POC",
-    hint: "Who we work with",
-    title: "Company & POC",
-    subtitle: "Tell us who this client is and who the main point of contact is.",
-  },
-  {
-    key: "associates",
-    label: "Associates",
-    hint: "Who else is involved",
-    title: "Associates",
-    subtitle: "Add any other contacts at this company (optional).",
-  },
-  {
-    key: "buybox",
-    label: "Buy Box",
-    hint: "What they want to buy",
-    title: "Buy Box",
-    subtitle: "Define their acquisition criteria.",
-  },
-  {
-    key: "script",
-    label: "Script",
-    hint: "How CSRs should pitch",
-    title: "Script",
-    subtitle: "Choose how CSRs should pitch this client.",
-  },
-  {
-    key: "services",
-    label: "Services & Data",
-    hint: "What they get",
-    title: "Services & Data",
-    subtitle: "Configure campaign services and data sourcing.",
-  },
-  {
-    key: "review",
-    label: "Review",
-    hint: "Confirm & create",
-    title: "Review & Create",
-    subtitle: "Confirm everything looks right before creating the client.",
-  },
-] as const;
 
 const EMPTY_ASSOCIATE: AssociateDraft = {
   name: "",
@@ -94,10 +75,89 @@ const EMPTY_ASSOCIATE: AssociateDraft = {
   phone: "",
   role: "",
   preferredContactMethod: "",
+  hsObjectId: "",
 };
 
-const nativeSelectClass =
-  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+// Mirrors CreateClientInput["services"][number] in lib/actions/create-client.ts
+// (kept local rather than imported since that file is "use server").
+type ServiceInput =
+  | { type: "cold_calling"; seatCount: number; name?: string; serviceStartDate?: string }
+  | {
+      type: "texting";
+      textingTier: TextingTier;
+      funnel?: TextingFunnel;
+      serviceStartDate?: string;
+      accountName?: string;
+      accountEmail?: string;
+    };
+
+type DataPackageInput = {
+  mode: DataMode;
+  tier?: PackageTier;
+  startDate?: string;
+  priceOverride?: number;
+  commitment?: PackageCommitment;
+  dataSourceProviderName?: string;
+  skipTracingType?: ProviderType;
+  skipTraceProviderName?: string;
+  skipTraceRateTier?: SkipTraceRateTier;
+  skipTraceRate?: number;
+  monthlySkipTraceExpected?: number;
+};
+
+const STEPS = [
+  {
+    key: "company",
+    label: "Company & POC",
+    hint: "Who we work with, and how they found us",
+    title: "Company & Point of Contact",
+    icon: Building2,
+  },
+  {
+    key: "associates",
+    label: "Associates",
+    hint: "Other contacts at this account (optional)",
+    title: "Associates",
+    icon: Users,
+  },
+  {
+    key: "buybox",
+    label: "Buy Box",
+    hint: "What properties this client wants to buy",
+    title: "Buy Box",
+    icon: MapPinned,
+  },
+  {
+    key: "cold_calling",
+    label: "Cold Calling",
+    hint: "Outbound calling setup, if enabled",
+    title: "Cold Calling",
+    icon: PhoneCall,
+  },
+  {
+    key: "texting",
+    label: "Texting",
+    hint: "SMS campaign setup, if enabled",
+    title: "Texting",
+    icon: MessageSquareText,
+  },
+  {
+    key: "data",
+    label: "Data & Skip Trace",
+    hint: "Data package, PAYG, or legacy + skip tracing",
+    title: "Data & Skip Trace",
+    icon: DatabaseIcon,
+  },
+  {
+    key: "review",
+    label: "Review",
+    hint: "Confirm everything before creating the client",
+    title: "Review & Create",
+    icon: ClipboardCheck,
+  },
+] as const;
+
+type StepKey = (typeof STEPS)[number]["key"];
 
 type ReferralPitchOption = {
   id: string;
@@ -108,6 +168,93 @@ type ClientOption = {
   id: string;
   label: string;
 };
+
+/** Selectable card used for scripts, funnels, data modes, and toggle groups. */
+function OptionTile({
+  active,
+  onClick,
+  title,
+  subtitle,
+  className,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  subtitle?: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "group relative flex flex-col gap-1.5 rounded-[14px] border p-4 text-left transition-all duration-200",
+        active
+          ? "border-[oklch(74%_0.15_224/0.7)] bg-[linear-gradient(160deg,oklch(28%_0.04_224),oklch(20%_0.03_262))] shadow-[0_0_0_1px_oklch(74%_0.15_224/0.35),0_0_28px_-6px_oklch(74%_0.15_224/0.55)]"
+          : "border-white/[0.12] bg-[linear-gradient(180deg,oklch(22%_0.018_262),oklch(17%_0.016_262))] hover:border-[oklch(74%_0.15_224/0.4)] hover:brightness-110",
+        className
+      )}
+    >
+      <span className={cn("font-heading text-sm", active ? "text-ink" : "text-ink-muted")}>
+        {title}
+      </span>
+      {subtitle && <span className="text-xs text-ink-faint">{subtitle}</span>}
+      {active && (
+        <Check
+          className="absolute right-3 top-3 h-4 w-4 text-[var(--brand-blue)]"
+          aria-hidden
+        />
+      )}
+    </button>
+  );
+}
+
+/** iOS-style toggle switch used for the two service-enable gates. */
+function ToggleRow({
+  checked,
+  onChange,
+  label,
+  description,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  description?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-center justify-between gap-4 rounded-[14px] border border-white/[0.12] bg-[linear-gradient(180deg,oklch(22%_0.018_262),oklch(17%_0.016_262))] p-4 text-left transition-all hover:border-[oklch(74%_0.15_224/0.4)] hover:shadow-[0_0_24px_-10px_oklch(74%_0.15_224/0.35)]"
+    >
+      <div>
+        <p className="font-heading text-sm text-ink">{label}</p>
+        {description && <p className="mt-0.5 text-xs text-ink-faint">{description}</p>}
+      </div>
+      <span
+        className={cn(
+          "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-[3px] transition-colors",
+          checked ? "bg-[oklch(74%_0.15_224)]" : "bg-white/15"
+        )}
+      >
+        <span
+          className={cn(
+            "h-[18px] w-[18px] rounded-full bg-white shadow transition-transform duration-200",
+            checked ? "translate-x-[20px]" : "translate-x-0"
+          )}
+        />
+      </span>
+    </button>
+  );
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="text-xs text-destructive">{message}</p>;
+}
 
 export function AddClientWizard({
   csrs,
@@ -125,43 +272,67 @@ export function AddClientWizard({
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const [stepIndex, setStepIndex] = useState(0);
-  const step = STEPS[stepIndex].key;
+  const step = STEPS[stepIndex].key as StepKey;
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Step 1 — Company & POC
   const [companyName, setCompanyName] = useState("");
   const [pocName, setPocName] = useState("");
   const [pocEmail, setPocEmail] = useState("");
   const [pocPhone, setPocPhone] = useState("");
   const [pocTitle, setPocTitle] = useState("");
+  const [preferredContactMethod, setPreferredContactMethod] = useState<ContactMethod | "">("");
+  const [hsObjectId, setHsObjectId] = useState("");
+  const [lifecycleStage, setLifecycleStage] = useState<LifecycleStage | "">("");
+  const [leadSource, setLeadSource] = useState("");
   const [assignedCsrId, setAssignedCsrId] = useState(callerRole === "csr" ? callerId : "");
 
+  const [wasReferred, setWasReferred] = useState(false);
+  const [referralId, setReferralId] = useState("");
+  const [referredByClientId, setReferredByClientId] = useState("");
+
+  // Step 2 — Associates
   const [associates, setAssociates] = useState<AssociateDraft[]>([]);
   const [associateDraft, setAssociateDraft] = useState<AssociateDraft>(EMPTY_ASSOCIATE);
+  const [associateError, setAssociateError] = useState<string | null>(null);
 
+  // Step 3 — Buy box
   const [propertyTypes, setPropertyTypes] = useState<string[]>([]);
   const [states, setStates] = useState<string[]>([]);
   const [areaCodes, setAreaCodes] = useState<string[]>([]);
   const [zipCodes, setZipCodes] = useState<string[]>([]);
   const [maxArv, setMaxArv] = useState("");
-  const [exclusions, setExclusions] = useState("");
+  const [zipStatsSheetLink, setZipStatsSheetLink] = useState("");
 
+  // Step 4 — Cold calling
+  const [enableColdCalling, setEnableColdCalling] = useState(false);
+  const [seatCount, setSeatCount] = useState("1");
+  const [campaignName, setCampaignName] = useState("");
+  const [coldCallingStartDate, setColdCallingStartDate] = useState("");
   const [script, setScript] = useState<ClientScript | "">("");
+  const [customScriptUrl, setCustomScriptUrl] = useState("");
 
-  const [services, setServices] = useState<ServiceDraft[]>([]);
-  const [seatCountDraft, setSeatCountDraft] = useState("1");
-  const [textingTierDraft, setTextingTierDraft] = useState<TextingTier>("50k");
+  // Step 5 — Texting
+  const [enableTexting, setEnableTexting] = useState(false);
+  const [textingTier, setTextingTier] = useState<TextingTier>("50k");
+  const [textingFunnel, setTextingFunnel] = useState<TextingFunnel | "">("");
+  const [textingStartDate, setTextingStartDate] = useState("");
+  const [textingAccountName, setTextingAccountName] = useState("");
+  const [textingAccountEmail, setTextingAccountEmail] = useState("");
 
-  const [dataPackageMode, setDataPackageMode] = useState<
-    "package" | "legacy" | "self_provided"
-  >("package");
+  // Step 6 — Data & skip trace
+  const [dataMode, setDataMode] = useState<DataMode>("package");
   const [packageTier, setPackageTier] = useState<PackageTier>("starter");
+  const [packageCommitment, setPackageCommitment] = useState<PackageCommitment | "">("");
   const [packageStartDate, setPackageStartDate] = useState("");
   const [packagePriceOverride, setPackagePriceOverride] = useState("");
-
-  const [wasReferred, setWasReferred] = useState(false);
-  const [referralId, setReferralId] = useState("");
-  const [referredByClientId, setReferredByClientId] = useState("");
+  const [skipTracingType, setSkipTracingType] = useState<ProviderType | "">("");
+  const [dataSourceProviderName, setDataSourceProviderName] = useState("");
+  const [skipTraceProviderName, setSkipTraceProviderName] = useState("");
+  const [skipTraceRateTier, setSkipTraceRateTier] = useState<SkipTraceRateTier | "">("");
+  const [skipTraceRate, setSkipTraceRate] = useState("");
+  const [monthlySkipTraceExpected, setMonthlySkipTraceExpected] = useState("");
 
   useEffect(() => {
     if (containerRef.current) staggerIn([containerRef.current]);
@@ -175,18 +346,51 @@ export function AddClientWizard({
     () => PROPERTY_TYPE_OPTIONS.map((p) => ({ value: p, label: p })),
     []
   );
+  const exclusions = useMemo(() => deriveExclusions(propertyTypes), [propertyTypes]);
+
+  const packageRecordsCap = PACKAGE_TIER_RECORDS[packageTier];
+  const monthlySkipExceedsCap =
+    dataMode === "package" &&
+    monthlySkipTraceExpected !== "" &&
+    Number(monthlySkipTraceExpected) > packageRecordsCap;
+
+  const hasAtLeastOneService = enableColdCalling || enableTexting;
 
   const canContinue = useMemo(() => {
     switch (step) {
       case "company":
-        return companyName.trim() !== "" && pocName.trim() !== "" && assignedCsrId !== "";
-      case "script":
-        return script !== "";
-      case "services":
         return (
-          services.length > 0 &&
-          (dataPackageMode !== "package" || packageStartDate !== "")
+          companyName.trim() !== "" &&
+          pocName.trim() !== "" &&
+          assignedCsrId !== "" &&
+          isValidUsPhone(pocPhone) &&
+          (!wasReferred || Boolean(referralId) || Boolean(referredByClientId))
         );
+      case "cold_calling":
+        if (!enableColdCalling) return true;
+        return (
+          Number(seatCount) > 0 &&
+          coldCallingStartDate !== "" &&
+          script !== "" &&
+          (script !== "custom" || customScriptUrl.trim() !== "")
+        );
+      case "texting":
+        if (!enableTexting) return true;
+        return textingFunnel !== "" && textingStartDate !== "";
+      case "data": {
+        if (dataMode === "package") {
+          if (!(packageStartDate !== "" && packageCommitment !== "" && !monthlySkipExceedsCap)) {
+            return false;
+          }
+        } else if (monthlySkipExceedsCap) {
+          return false;
+        }
+        if (dataMode === "self_provided" && !dataSourceProviderName.trim()) return false;
+        if (skipTracingType === "self_provided" && !skipTraceProviderName.trim()) return false;
+        return true;
+      }
+      case "review":
+        return hasAtLeastOneService;
       default:
         return true;
     }
@@ -195,10 +399,26 @@ export function AddClientWizard({
     companyName,
     pocName,
     assignedCsrId,
+    pocPhone,
+    wasReferred,
+    referralId,
+    referredByClientId,
+    enableColdCalling,
+    seatCount,
+    coldCallingStartDate,
     script,
-    services,
-    dataPackageMode,
+    customScriptUrl,
+    enableTexting,
+    textingFunnel,
+    textingStartDate,
+    dataMode,
     packageStartDate,
+    packageCommitment,
+    monthlySkipExceedsCap,
+    dataSourceProviderName,
+    skipTracingType,
+    skipTraceProviderName,
+    hasAtLeastOneService,
   ]);
 
   function goTo(index: number) {
@@ -207,6 +427,11 @@ export function AddClientWizard({
 
   function addAssociateDraft() {
     if (!associateDraft.name.trim()) return;
+    if (!isValidUsPhone(associateDraft.phone)) {
+      setAssociateError("Enter a valid US phone number, or leave it blank.");
+      return;
+    }
+    setAssociateError(null);
     setAssociates((prev) => [...prev, associateDraft]);
     setAssociateDraft(EMPTY_ASSOCIATE);
   }
@@ -215,32 +440,66 @@ export function AddClientWizard({
     setAssociates((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function addColdCallingService() {
-    const seatCount = Number(seatCountDraft);
-    if (!seatCount || seatCount < 1) return;
-    setServices((prev) => [...prev, { type: "cold_calling", seatCount: seatCountDraft }]);
-    setSeatCountDraft("1");
-  }
-
-  function addTextingService() {
-    setServices((prev) => [...prev, { type: "texting", textingTier: textingTierDraft }]);
-  }
-
-  function removeService(index: number) {
-    setServices((prev) => prev.filter((_, i) => i !== index));
-  }
-
   async function handleCreate() {
     setSubmitting(true);
     setError(null);
+
+    const services: ServiceInput[] = [];
+    if (enableColdCalling) {
+      services.push({
+        type: "cold_calling",
+        seatCount: Number(seatCount) || 1,
+        name: campaignName || undefined,
+        serviceStartDate: coldCallingStartDate || undefined,
+      });
+    }
+    if (enableTexting) {
+      services.push({
+        type: "texting",
+        textingTier,
+        funnel: textingFunnel || undefined,
+        serviceStartDate: textingStartDate || undefined,
+        accountName: textingAccountName || undefined,
+        accountEmail: textingAccountEmail || undefined,
+      });
+    }
+
+    const dataPackage: DataPackageInput = {
+      mode: dataMode,
+      tier: dataMode === "package" ? packageTier : undefined,
+      startDate: dataMode === "package" ? packageStartDate : undefined,
+      priceOverride:
+        dataMode === "package" && packagePriceOverride !== ""
+          ? Number(packagePriceOverride)
+          : undefined,
+      commitment: dataMode === "package" ? packageCommitment || undefined : undefined,
+      dataSourceProviderName:
+        dataMode === "self_provided" ? dataSourceProviderName.trim() : undefined,
+      skipTracingType: skipTracingType || undefined,
+      skipTraceProviderName:
+        skipTracingType === "self_provided" ? skipTraceProviderName.trim() : undefined,
+      skipTraceRateTier: skipTraceRateTier || undefined,
+      skipTraceRate:
+        skipTraceRateTier === "custom" && skipTraceRate !== ""
+          ? Number(skipTraceRate)
+          : undefined,
+      monthlySkipTraceExpected:
+        monthlySkipTraceExpected !== "" ? Number(monthlySkipTraceExpected) : undefined,
+    };
 
     const result = await createClientRecord({
       companyName,
       poc: {
         name: pocName,
         email: pocEmail || undefined,
-        phone: pocPhone || undefined,
+        phone: toUsPhoneE164(pocPhone) || undefined,
         title: pocTitle || undefined,
+        preferredContactMethod: preferredContactMethod || undefined,
+        hsObjectId: hsObjectId || undefined,
+        lifecycleStage: lifecycleStage || undefined,
+        leadSource: leadSource || undefined,
+        customScriptUrl:
+          enableColdCalling && script === "custom" ? customScriptUrl || undefined : undefined,
       },
       assignedCsrId,
       associates: associates
@@ -248,9 +507,10 @@ export function AddClientWizard({
         .map((a) => ({
           name: a.name,
           email: a.email || undefined,
-          phone: a.phone || undefined,
+          phone: toUsPhoneE164(a.phone) || undefined,
           role: a.role || undefined,
           preferredContactMethod: a.preferredContactMethod || undefined,
+          hsObjectId: a.hsObjectId || undefined,
         })),
       buyBox: {
         property_types: propertyTypes,
@@ -259,29 +519,14 @@ export function AddClientWizard({
         zip_codes: zipCodes,
         max_arv: maxArv ? Number(maxArv) : null,
         exclusions: exclusions || null,
+        zip_stats_sheet_link: zipStatsSheetLink || null,
       },
-      script: script as ClientScript,
-      services: services.map((s) =>
-        s.type === "cold_calling"
-          ? { type: "cold_calling" as const, seatCount: Number(s.seatCount) }
-          : { type: "texting" as const, textingTier: s.textingTier }
-      ),
-      dataPackage:
-        dataPackageMode === "package"
-          ? {
-              mode: "package",
-              tier: packageTier,
-              startDate: packageStartDate,
-              priceOverride: packagePriceOverride ? Number(packagePriceOverride) : undefined,
-            }
-          : dataPackageMode === "legacy"
-            ? { mode: "legacy" }
-            : { mode: "self_provided" },
+      script: enableColdCalling && script ? script : undefined,
+      services,
+      dataPackage,
       referralId: wasReferred && referralId ? referralId : undefined,
       referredByClientId:
-        wasReferred && !referralId && referredByClientId
-          ? referredByClientId
-          : undefined,
+        wasReferred && !referralId && referredByClientId ? referredByClientId : undefined,
     });
 
     setSubmitting(false);
@@ -298,560 +543,930 @@ export function AddClientWizard({
   const currentStepMeta = STEPS[stepIndex];
 
   return (
-    <div className="flex min-h-full">
-      <aside className="flex w-[280px] shrink-0 flex-col gap-8 border-r border-white/[0.07] bg-white/[0.03] p-[36px_30px] backdrop-blur-[24px] backdrop-saturate-160">
-        <Link
-          href="/clients"
-          className="flex items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink"
-        >
-          ← Cancel
-        </Link>
+    <div className="wizard-stage">
+      <div className="wizard-column">
+        <header className="wizard-header">
+          <div className="wizard-header__brand">
+            <Image
+              src="/res-va-logo.png"
+              alt="RES-VA"
+              width={96}
+              height={20}
+              className="wizard-header__logo"
+              priority
+            />
+            <span className="wizard-header__divider" aria-hidden />
+            <h1 className="wizard-header__title">Add Client</h1>
+          </div>
+          <Link href="/clients" className="wizard-header__cancel">
+            Cancel
+          </Link>
+        </header>
 
-        <div className="flex items-center gap-2">
-          <Image
-            src="/logo-mark.png"
-            alt=""
-            width={20}
-            height={20}
-            className="shrink-0 drop-shadow-[0_0_10px_oklch(72%_0.15_224/0.6)]"
-          />
-          <span className="font-heading text-sm font-bold tracking-tight text-ink not-italic">
-            ROVER
-          </span>
-        </div>
+        <p className="wizard-lede">
+          Walk through each step to set up the company, contacts, and services.
+        </p>
 
-        <div>
-          <h2 className="font-heading text-lg text-ink">New Client</h2>
-          <p className="text-sm text-ink-muted">A guided setup — six quick steps.</p>
-        </div>
-
-        <div className="flex flex-col">
+        <nav className="wizard-steps" aria-label="Wizard steps">
           {STEPS.map((s, i) => {
             const isDone = i < stepIndex;
             const isActive = i === stepIndex;
-            const isLast = i === STEPS.length - 1;
+            const Icon = s.icon;
             return (
-              <div key={s.key} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <div
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                      isActive || isDone
-                        ? "bg-[linear-gradient(135deg,var(--brand-blue),var(--brand-blue-deep))] text-white"
-                        : "border border-white/15 bg-white/[0.03] text-ink-faint"
-                    }`}
-                  >
-                    {isDone ? <Check className="h-3.5 w-3.5" aria-hidden /> : i + 1}
-                  </div>
-                  {!isLast && (
-                    <div
-                      className={`w-px flex-1 ${isDone ? "bg-[var(--brand-blue)]" : "bg-white/10"}`}
-                      style={{ minHeight: "28px" }}
-                      aria-hidden
-                    />
-                  )}
-                </div>
-                <div className={isLast ? "pb-0" : "pb-7"}>
-                  <p
-                    className={`text-sm font-medium ${
-                      isActive || isDone ? "text-ink" : "text-ink-muted"
-                    }`}
-                  >
-                    {s.label}
-                  </p>
-                  <p className="text-xs text-ink-faint">{s.hint}</p>
-                </div>
-              </div>
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => (isDone ? goTo(i) : undefined)}
+                disabled={!isDone && !isActive}
+                className={cn(
+                  "wizard-step",
+                  isActive && "wizard-step--active",
+                  isDone && "wizard-step--done"
+                )}
+              >
+                <span className="wizard-step__circle">
+                  <Icon className="wizard-step__icon" aria-hidden />
+                </span>
+                <span className="wizard-step__label">{s.label}</span>
+              </button>
             );
           })}
-        </div>
-      </aside>
+        </nav>
 
-      <div className="flex flex-1 justify-center px-10 pt-14">
-        <div className="flex w-full max-w-[640px] flex-col gap-6">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.14em] text-ledger uppercase">
-              Step {stepIndex + 1} of {STEPS.length}
+        <div className="wizard-bars" aria-hidden>
+          {STEPS.map((s, i) => (
+            <div
+              key={s.key}
+              className={cn(
+                "wizard-bars__seg",
+                i < stepIndex && "wizard-bars__seg--done",
+                i === stepIndex && "wizard-bars__seg--active"
+              )}
+            />
+          ))}
+        </div>
+
+        <div
+          ref={containerRef}
+          key={step}
+          className="wizard-card wizard-panel-enter"
+        >
+          <div className="wizard-card__head">
+            <h2 className="wizard-card__title">{currentStepMeta.title}</h2>
+            <p className="wizard-card__meta">
+              Step {stepIndex + 1} of {STEPS.length} — {currentStepMeta.hint}
             </p>
-            <h1 className="font-heading text-[26px] text-ink">{currentStepMeta.title}</h1>
-            <p className="mt-1 text-sm text-ink-muted">{currentStepMeta.subtitle}</p>
           </div>
 
-          <div ref={containerRef} className="glass-panel rounded-[20px] p-7">
-        {step === "company" && (
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="company-name">Company name</Label>
-              <Input
-                id="company-name"
-                required
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="poc-name">POC name</Label>
-              <Input id="poc-name" required value={pocName} onChange={(e) => setPocName(e.target.value)} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="poc-email">POC email</Label>
-                <Input
-                  id="poc-email"
-                  type="email"
-                  value={pocEmail}
-                  onChange={(e) => setPocEmail(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="poc-phone">POC phone</Label>
-                <Input
-                  id="poc-phone"
-                  type="tel"
-                  value={pocPhone}
-                  onChange={(e) => setPocPhone(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="poc-title">POC title</Label>
-              <Input id="poc-title" value={pocTitle} onChange={(e) => setPocTitle(e.target.value)} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="assigned-csr">Assigned CSR</Label>
-              {callerRole === "csr" ? (
-                <Input id="assigned-csr" disabled value="You" />
-              ) : (
-                <select
-                  id="assigned-csr"
-                  required
-                  value={assignedCsrId}
-                  onChange={(e) => setAssignedCsrId(e.target.value)}
-                  className={nativeSelectClass}
-                >
-                  <option value="" disabled>
-                    Select a CSR…
-                  </option>
-                  {csrs.map((csr) => (
-                    <option key={csr.id} value={csr.id}>
-                      {csr.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-            <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
-              <label className="flex items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  checked={wasReferred}
-                  onChange={(e) => {
-                    setWasReferred(e.target.checked);
-                    if (!e.target.checked) {
-                      setReferralId("");
-                      setReferredByClientId("");
-                    }
-                  }}
-                  className="size-4 rounded border-white/20"
-                />
-                Referred by an existing client?
-              </label>
-              {wasReferred && (
-                <div className="flex flex-col gap-3">
-                  {openPitches.length > 0 && (
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="open-pitch">Link open pitch (optional)</Label>
-                      <select
-                        id="open-pitch"
-                        value={referralId}
-                        onChange={(e) => {
-                          setReferralId(e.target.value);
-                          if (e.target.value) setReferredByClientId("");
-                        }}
-                        className={nativeSelectClass}
+            {step === "company" && (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="company-name">Company name</Label>
+                  <Input
+                    id="company-name"
+                    required
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="poc-name">POC name</Label>
+                  <Input
+                    id="poc-name"
+                    required
+                    value={pocName}
+                    onChange={(e) => setPocName(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="poc-email">POC email</Label>
+                    <Input
+                      id="poc-email"
+                      type="email"
+                      value={pocEmail}
+                      onChange={(e) => setPocEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="poc-phone">POC phone (US)</Label>
+                    <Input
+                      id="poc-phone"
+                      type="tel"
+                      placeholder="(555) 123-4567"
+                      aria-invalid={!isValidUsPhone(pocPhone)}
+                      value={pocPhone}
+                      onChange={(e) => setPocPhone(e.target.value)}
+                    />
+                    <FieldError
+                      message={
+                        !isValidUsPhone(pocPhone) ? "Enter a valid 10-digit US phone number." : undefined
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="poc-title">POC title</Label>
+                  <Input
+                    id="poc-title"
+                    value={pocTitle}
+                    onChange={(e) => setPocTitle(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label id="poc-contact-method-label">Preferred contact method</Label>
+                  <div
+                    className="wizard-seg"
+                    role="group"
+                    aria-labelledby="poc-contact-method-label"
+                  >
+                    {(["email", "phone", "text"] as ContactMethod[]).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        className={cn(
+                          "wizard-seg__btn",
+                          preferredContactMethod === m && "wizard-seg__btn--active"
+                        )}
+                        aria-pressed={preferredContactMethod === m}
+                        onClick={() =>
+                          setPreferredContactMethod((prev) => (prev === m ? "" : m))
+                        }
                       >
-                        <option value="">Create from referring client…</option>
-                        {openPitches.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                        {CONTACT_METHOD_LABELS[m]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="lifecycle-stage">Lifecycle stage</Label>
+                    <ListSelect
+                      id="lifecycle-stage"
+                      value={lifecycleStage}
+                      onChange={(v) => setLifecycleStage(v as LifecycleStage | "")}
+                      placeholder="Select…"
+                      options={[
+                        { value: "", label: "—" },
+                        ...(Object.keys(LIFECYCLE_STAGE_LABELS) as LifecycleStage[]).map((s) => ({
+                          value: s,
+                          label: LIFECYCLE_STAGE_LABELS[s],
+                        })),
+                      ]}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="lead-source">Lead source</Label>
+                    <SearchableSelect
+                      id="lead-source"
+                      options={LEAD_SOURCE_OPTIONS}
+                      value={leadSource}
+                      onChange={setLeadSource}
+                      placeholder="Search lead sources…"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="hs-object-id">HubSpot object ID</Label>
+                  <Input
+                    id="hs-object-id"
+                    value={hsObjectId}
+                    onChange={(e) => setHsObjectId(e.target.value)}
+                    placeholder="Optional"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="assigned-csr">Assigned CSR</Label>
+                  {callerRole === "csr" ? (
+                    <Input id="assigned-csr" disabled value="You" />
+                  ) : (
+                    <ListSelect
+                      id="assigned-csr"
+                      required
+                      value={assignedCsrId}
+                      onChange={setAssignedCsrId}
+                      placeholder="Select a CSR…"
+                      options={csrs.map((csr) => ({ value: csr.id, label: csr.name }))}
+                    />
                   )}
-                  {!referralId && (
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="referred-by">Referring client</Label>
-                      <select
-                        id="referred-by"
-                        required={wasReferred}
-                        value={referredByClientId}
-                        onChange={(e) => setReferredByClientId(e.target.value)}
-                        className={nativeSelectClass}
-                      >
-                        <option value="" disabled>
-                          Select referring client…
-                        </option>
-                        {referringClients.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
+                </div>
+                <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
+                  <label className="flex items-center gap-2 text-sm text-ink">
+                    <input
+                      type="checkbox"
+                      checked={wasReferred}
+                      onChange={(e) => {
+                        setWasReferred(e.target.checked);
+                        if (!e.target.checked) {
+                          setReferralId("");
+                          setReferredByClientId("");
+                        }
+                      }}
+                      className="size-4 rounded border-white/20"
+                    />
+                    Referred by an existing client?
+                  </label>
+                  {wasReferred && (
+                    <div className="flex flex-col gap-3">
+                      {openPitches.length > 0 && (
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor="open-pitch">Link open pitch (optional)</Label>
+                          <ListSelect
+                            id="open-pitch"
+                            value={referralId}
+                            onChange={(v) => {
+                              setReferralId(v);
+                              if (v) setReferredByClientId("");
+                            }}
+                            placeholder="Create from referring client…"
+                            options={[
+                              { value: "", label: "Create from referring client…" },
+                              ...openPitches.map((p) => ({ value: p.id, label: p.label })),
+                            ]}
+                          />
+                        </div>
+                      )}
+                      {!referralId && (
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor="referred-by">Referring client</Label>
+                          <ListSelect
+                            id="referred-by"
+                            required={wasReferred}
+                            value={referredByClientId}
+                            onChange={setReferredByClientId}
+                            placeholder="Select referring client…"
+                            options={referringClients.map((c) => ({
+                              value: c.id,
+                              label: c.label,
+                            }))}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {step === "associates" && (
-          <div className="flex flex-col gap-4">
-            <p className="text-sm text-ink-muted">
-              Add any other contacts at this company (optional).
-            </p>
-            {associates.length > 0 && (
-              <div className="glass-panel rounded-[var(--radius-lg)]">
-                {associates.map((a, i) => (
-                  <div key={i} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-                    <span className="text-ink">
-                      {a.name}
-                      {a.role ? ` — ${a.role}` : ""}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeAssociate(i)}
-                      className="text-ink-muted hover:text-destructive"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Label>Name</Label>
-                <Input
-                  value={associateDraft.name}
-                  onChange={(e) => setAssociateDraft((d) => ({ ...d, name: e.target.value }))}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>Role</Label>
-                <Input
-                  placeholder="Finance, Co-Investor…"
-                  value={associateDraft.role}
-                  onChange={(e) => setAssociateDraft((d) => ({ ...d, role: e.target.value }))}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={associateDraft.email}
-                  onChange={(e) => setAssociateDraft((d) => ({ ...d, email: e.target.value }))}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>Phone</Label>
-                <Input
-                  type="tel"
-                  value={associateDraft.phone}
-                  onChange={(e) => setAssociateDraft((d) => ({ ...d, phone: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Preferred contact method</Label>
-              <select
-                value={associateDraft.preferredContactMethod}
-                onChange={(e) =>
-                  setAssociateDraft((d) => ({
-                    ...d,
-                    preferredContactMethod: e.target.value as ContactMethod | "",
-                  }))
-                }
-                className={nativeSelectClass}
-              >
-                <option value="">—</option>
-                {(["email", "phone", "text"] as ContactMethod[]).map((m) => (
-                  <option key={m} value={m}>
-                    {CONTACT_METHOD_LABELS[m]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <Button type="button" variant="outline" onClick={addAssociateDraft}>
-              + Add associate
-            </Button>
-          </div>
-        )}
 
-        {step === "buybox" && (
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-2">
-              <Label>Property types</Label>
-              <MultiSelectPills
-                options={propertyTypeOptions}
-                selected={propertyTypes}
-                onChange={setPropertyTypes}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>States</Label>
-              <div className="max-h-40 overflow-y-auto glass-panel rounded-[var(--radius-lg)] p-3">
-                <MultiSelectPills options={stateOptions} selected={states} onChange={setStates} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Label>Area codes</Label>
-                <TagInput values={areaCodes} onChange={setAreaCodes} placeholder="e.g. 214, press Enter" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>Zip codes</Label>
-                <TagInput values={zipCodes} onChange={setZipCodes} placeholder="e.g. 75001, press Enter" />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="max-arv">Max ARV</Label>
-              <Input
-                id="max-arv"
-                type="number"
-                min={0}
-                value={maxArv}
-                onChange={(e) => setMaxArv(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="exclusions">Exclusions</Label>
-              <Textarea id="exclusions" value={exclusions} onChange={(e) => setExclusions(e.target.value)} />
-            </div>
-          </div>
-        )}
-
-        {step === "script" && (
-          <div className="grid grid-cols-2 gap-4">
-            {(["four_pillars", "motivation_only"] as ClientScript[]).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setScript(s)}
-                aria-pressed={script === s}
-                className={`flex flex-col gap-1 border p-4 text-left transition-colors ${
-                  script === s
-                    ? "border-ledger bg-ledger/10"
-                    : "border-white/10 bg-white/[0.02] backdrop-blur-md hover:bg-white/[0.05] hover:border-[rgba(56,182,240,0.3)]"
-                }`}
-              >
-                <span className="font-heading text-base text-ink">{CLIENT_SCRIPT_LABELS[s]}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {step === "services" && (
-          <div className="flex flex-col gap-6">
-            {services.length > 0 && (
-              <div className="glass-panel rounded-[var(--radius-lg)]">
-                {services.map((s, i) => (
-                  <div key={i} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-                    <span className="text-ink">
-                      {s.type === "cold_calling"
-                        ? `Cold Calling — ${s.seatCount} seat${Number(s.seatCount) === 1 ? "" : "s"}`
-                        : `Texting — ${TEXTING_TIER_LABELS[s.textingTier]}`}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeService(i)}
-                      className="text-ink-muted hover:text-destructive"
-                    >
-                      Remove
-                    </button>
+            {step === "associates" && (
+              <div className="flex flex-col gap-4">
+                <p className="text-sm text-ink-muted">
+                  Add any other contacts at this company (optional).
+                </p>
+                {associates.length > 0 && (
+                  <div className="glass-panel rounded-[var(--radius-lg)]">
+                    {associates.map((a, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+                      >
+                        <span className="text-ink">
+                          {a.name}
+                          {a.role ? ` — ${a.role}` : ""}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeAssociate(i)}
+                          className="text-ink-muted hover:text-destructive"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-2 glass-panel rounded-[var(--radius-lg)] p-3">
-                <Label>Cold calling seats</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={seatCountDraft}
-                  onChange={(e) => setSeatCountDraft(e.target.value)}
-                />
-                <Button type="button" variant="outline" onClick={addColdCallingService}>
-                  + Add cold calling
-                </Button>
-              </div>
-              <div className="flex flex-col gap-2 glass-panel rounded-[var(--radius-lg)] p-3">
-                <Label>Texting tier</Label>
-                <select
-                  value={textingTierDraft}
-                  onChange={(e) => setTextingTierDraft(e.target.value as TextingTier)}
-                  className={nativeSelectClass}
-                >
-                  {(["50k", "75k", "100k"] as TextingTier[]).map((t) => (
-                    <option key={t} value={t}>
-                      {TEXTING_TIER_LABELS[t]}
-                    </option>
-                  ))}
-                </select>
-                <Button type="button" variant="outline" onClick={addTextingService}>
-                  + Add texting
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <Label>Data source</Label>
-              <div className="grid grid-cols-3 gap-3">
-                {(
-                  [
-                    { mode: "package" as const, label: "Package" },
-                    { mode: "legacy" as const, label: "Legacy" },
-                    { mode: "self_provided" as const, label: "Self-Provided" },
-                  ]
-                ).map((opt) => (
-                  <button
-                    key={opt.mode}
-                    type="button"
-                    onClick={() => setDataPackageMode(opt.mode)}
-                    aria-pressed={dataPackageMode === opt.mode}
-                    className={`border p-3 text-left text-sm transition-colors ${
-                      dataPackageMode === opt.mode
-                        ? "border-ledger bg-ledger/10 text-ink"
-                        : "border-white/10 bg-white/[0.02] text-ink-muted backdrop-blur-md hover:bg-white/[0.05] hover:border-[rgba(56,182,240,0.3)]"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-
-              {dataPackageMode === "package" && (
-                <div className="grid grid-cols-2 gap-4">
+                )}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="package-tier">Package tier</Label>
-                    <select
-                      id="package-tier"
-                      value={packageTier}
-                      onChange={(e) => setPackageTier(e.target.value as PackageTier)}
-                      className={nativeSelectClass}
-                    >
-                      {(["starter", "pro", "growth"] as PackageTier[]).map((t) => (
-                        <option key={t} value={t}>
-                          {PACKAGE_TIER_LABELS[t]} — ${PACKAGE_TIER_PRICES[t].toLocaleString()}/mo
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="package-start">Start date</Label>
+                    <Label>Name</Label>
                     <Input
-                      id="package-start"
-                      type="date"
-                      required
-                      value={packageStartDate}
-                      onChange={(e) => setPackageStartDate(e.target.value)}
+                      value={associateDraft.name}
+                      onChange={(e) =>
+                        setAssociateDraft((d) => ({ ...d, name: e.target.value }))
+                      }
                     />
                   </div>
-                  <div className="col-span-2 flex flex-col gap-1.5">
-                    <Label htmlFor="package-price-override">Price override (optional)</Label>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Role</Label>
                     <Input
-                      id="package-price-override"
+                      placeholder="Finance, Co-Investor…"
+                      value={associateDraft.role}
+                      onChange={(e) =>
+                        setAssociateDraft((d) => ({ ...d, role: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={associateDraft.email}
+                      onChange={(e) =>
+                        setAssociateDraft((d) => ({ ...d, email: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Phone (US)</Label>
+                    <Input
+                      type="tel"
+                      placeholder="(555) 123-4567"
+                      value={associateDraft.phone}
+                      onChange={(e) =>
+                        setAssociateDraft((d) => ({ ...d, phone: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Preferred contact method</Label>
+                    <ListSelect
+                      value={associateDraft.preferredContactMethod}
+                      onChange={(v) =>
+                        setAssociateDraft((d) => ({
+                          ...d,
+                          preferredContactMethod: v as ContactMethod | "",
+                        }))
+                      }
+                      placeholder="Select…"
+                      options={[
+                        { value: "", label: "—" },
+                        ...(["email", "phone", "text"] as ContactMethod[]).map((m) => ({
+                          value: m,
+                          label: CONTACT_METHOD_LABELS[m],
+                        })),
+                      ]}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>HubSpot object ID</Label>
+                    <Input
+                      value={associateDraft.hsObjectId}
+                      onChange={(e) =>
+                        setAssociateDraft((d) => ({ ...d, hsObjectId: e.target.value }))
+                      }
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+                <FieldError message={associateError ?? undefined} />
+                <Button type="button" variant="outline" onClick={addAssociateDraft}>
+                  + Add associate
+                </Button>
+              </div>
+            )}
+
+            {step === "buybox" && (
+              <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-2">
+                  <Label>Property types</Label>
+                  <MultiSelectPills
+                    options={propertyTypeOptions}
+                    selected={propertyTypes}
+                    onChange={setPropertyTypes}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label>States</Label>
+                  <div className="max-h-40 overflow-y-auto glass-panel rounded-[var(--radius-lg)] p-3">
+                    <MultiSelectPills options={stateOptions} selected={states} onChange={setStates} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Area codes</Label>
+                    <TagInput
+                      values={areaCodes}
+                      onChange={setAreaCodes}
+                      placeholder="e.g. 214, press Enter"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Zip codes</Label>
+                    <TagInput
+                      values={zipCodes}
+                      onChange={setZipCodes}
+                      placeholder="e.g. 75001, press Enter"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="max-arv">Max ARV</Label>
+                  <Input
+                    id="max-arv"
+                    type="number"
+                    min={0}
+                    value={maxArv}
+                    onChange={(e) => setMaxArv(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="zip-stats-sheet">Zip stats sheet link</Label>
+                  <Input
+                    id="zip-stats-sheet"
+                    type="url"
+                    placeholder="https://…"
+                    value={zipStatsSheetLink}
+                    onChange={(e) => setZipStatsSheetLink(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label>Exclusions</Label>
+                  <p className="rounded-[11px] border border-white/[0.1] bg-black/10 px-3.5 py-[11px] text-sm text-ink-muted">
+                    {exclusions || "None — every property type is selected."}
+                  </p>
+                  <p className="text-xs text-ink-faint">
+                    Auto-derived from the property types not selected above.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {step === "cold_calling" && (
+              <div className="flex flex-col gap-5">
+                <ToggleRow
+                  checked={enableColdCalling}
+                  onChange={setEnableColdCalling}
+                  label="Enable cold calling"
+                  description="Provision cold calling seats and a pitch script for this client."
+                />
+                {enableColdCalling && (
+                  <>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="seat-count">Seats</Label>
+                        <Input
+                          id="seat-count"
+                          type="number"
+                          min={1}
+                          value={seatCount}
+                          onChange={(e) => setSeatCount(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="campaign-name">Campaign name</Label>
+                        <Input
+                          id="campaign-name"
+                          placeholder="Optional"
+                          value={campaignName}
+                          onChange={(e) => setCampaignName(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="cc-start-date">Service start date</Label>
+                      <Input
+                        id="cc-start-date"
+                        type="date"
+                        required
+                        value={coldCallingStartDate}
+                        onChange={(e) => setColdCallingStartDate(e.target.value)}
+                      />
+                      <FieldError
+                        message={
+                          coldCallingStartDate === ""
+                            ? "A service start date is required."
+                            : undefined
+                        }
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label>Script</Label>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {(["four_pillars", "motivation_only", "realtor", "custom"] as ClientScript[]).map(
+                          (s) => (
+                            <OptionTile
+                              key={s}
+                              active={script === s}
+                              onClick={() => setScript(s)}
+                              title={CLIENT_SCRIPT_LABELS[s]}
+                            />
+                          )
+                        )}
+                      </div>
+                    </div>
+                    {script === "custom" && (
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="custom-script-url">Custom script URL</Label>
+                        <Input
+                          id="custom-script-url"
+                          type="url"
+                          required
+                          placeholder="https://…"
+                          value={customScriptUrl}
+                          onChange={(e) => setCustomScriptUrl(e.target.value)}
+                        />
+                        <FieldError
+                          message={
+                            customScriptUrl.trim() === ""
+                              ? "A URL is required for a custom script."
+                              : undefined
+                          }
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {step === "texting" && (
+              <div className="flex flex-col gap-5">
+                <ToggleRow
+                  checked={enableTexting}
+                  onChange={setEnableTexting}
+                  label="Enable texting"
+                  description="Provision a texting package and account for this client."
+                />
+                {enableTexting && (
+                  <>
+                    <div className="flex flex-col gap-2">
+                      <Label>Texting package</Label>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        {(["50k", "75k", "100k"] as TextingTier[]).map((t) => (
+                          <OptionTile
+                            key={t}
+                            active={textingTier === t}
+                            onClick={() => setTextingTier(t)}
+                            title={TEXTING_PACKAGE_LABELS[t]}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label>Funnel</Label>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        {(["narrow", "medium", "wide"] as TextingFunnel[]).map((f) => (
+                          <OptionTile
+                            key={f}
+                            active={textingFunnel === f}
+                            onClick={() => setTextingFunnel(f)}
+                            title={TEXTING_FUNNEL_LABELS[f]}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="texting-start-date">Service start date</Label>
+                        <Input
+                          id="texting-start-date"
+                          type="date"
+                          required
+                          value={textingStartDate}
+                          onChange={(e) => setTextingStartDate(e.target.value)}
+                        />
+                        <FieldError
+                          message={
+                            textingStartDate === ""
+                              ? "A service start date is required."
+                              : undefined
+                          }
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="texting-account-name">Account name</Label>
+                        <Input
+                          id="texting-account-name"
+                          placeholder="Optional"
+                          value={textingAccountName}
+                          onChange={(e) => setTextingAccountName(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="texting-account-email">Account email</Label>
+                      <Input
+                        id="texting-account-email"
+                        type="email"
+                        placeholder="Optional"
+                        value={textingAccountEmail}
+                        onChange={(e) => setTextingAccountEmail(e.target.value)}
+                      />
+                    </div>
+                    <p className="text-xs text-ink-faint">
+                      Don&apos;t have account details yet? Leave them blank and ask the texting
+                      department to provision the account after creation.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
+            {step === "data" && (
+              <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-2">
+                  <Label>Data source</Label>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {(
+                      [
+                        { mode: "package" as const, label: "Package" },
+                        { mode: "payg" as const, label: "PAYG" },
+                        { mode: "legacy" as const, label: "Legacy" },
+                        { mode: "self_provided" as const, label: "Self-Provided" },
+                      ]
+                    ).map((opt) => (
+                      <OptionTile
+                        key={opt.mode}
+                        active={dataMode === opt.mode}
+                        onClick={() => {
+                          setDataMode(opt.mode);
+                          if (opt.mode !== "self_provided") setDataSourceProviderName("");
+                        }}
+                        title={opt.label}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {dataMode === "self_provided" && (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="data-provider-name">Data provider name</Label>
+                    <Input
+                      id="data-provider-name"
+                      value={dataSourceProviderName}
+                      onChange={(e) => setDataSourceProviderName(e.target.value)}
+                      placeholder="e.g. Property Radar, Batch Leads…"
+                      required
+                    />
+                    <p className="text-xs text-ink-faint">
+                      If the source isn&apos;t known, enter Unknown.
+                    </p>
+                  </div>
+                )}
+
+                {dataMode === "package" && (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2">
+                      <Label>Package tier</Label>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        {(["starter", "growth", "pro"] as PackageTier[]).map((t) => (
+                          <OptionTile
+                            key={t}
+                            active={packageTier === t}
+                            onClick={() => setPackageTier(t)}
+                            title={PACKAGE_TIER_LABELS[t]}
+                            subtitle={`$${PACKAGE_TIER_PRICES[t].toLocaleString()}/mo · ${PACKAGE_TIER_RECORDS[t].toLocaleString()} records`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label>Commitment</Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {(["three_month", "six_month"] as PackageCommitment[]).map((c) => (
+                          <OptionTile
+                            key={c}
+                            active={packageCommitment === c}
+                            onClick={() => setPackageCommitment(c)}
+                            title={PACKAGE_COMMITMENT_LABELS[c]}
+                          />
+                        ))}
+                      </div>
+                      <FieldError
+                        message={packageCommitment === "" ? "A commitment term is required." : undefined}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="package-start">Start date</Label>
+                        <Input
+                          id="package-start"
+                          type="date"
+                          required
+                          value={packageStartDate}
+                          onChange={(e) => setPackageStartDate(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="package-price-override">Price override (optional)</Label>
+                        <Input
+                          id="package-price-override"
+                          type="number"
+                          min={0}
+                          placeholder={`$${PACKAGE_TIER_PRICES[packageTier].toLocaleString()}`}
+                          value={packagePriceOverride}
+                          onChange={(e) => setPackagePriceOverride(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-4 border-t border-white/10 pt-5">
+                  <Label>Skip tracing</Label>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-2">
+                    {(["res", "self_provided"] as ProviderType[]).map((t) => (
+                      <OptionTile
+                        key={t}
+                        active={skipTracingType === t}
+                        onClick={() => {
+                          setSkipTracingType(t);
+                          if (t !== "self_provided") {
+                            setSkipTraceProviderName("");
+                          } else {
+                            setSkipTraceRateTier("");
+                            setSkipTraceRate("");
+                          }
+                        }}
+                        title={SKIP_TRACING_SOURCE_LABELS[t]}
+                      />
+                    ))}
+                  </div>
+                  {skipTracingType === "self_provided" && (
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="skip-provider-name">Skip-trace provider name</Label>
+                      <Input
+                        id="skip-provider-name"
+                        value={skipTraceProviderName}
+                        onChange={(e) => setSkipTraceProviderName(e.target.value)}
+                        placeholder="e.g. Kind Skip, Deal Machine…"
+                        required
+                      />
+                      <p className="text-xs text-ink-faint">
+                        If the source isn&apos;t known, enter Unknown.
+                      </p>
+                    </div>
+                  )}
+{skipTracingType === "res" && (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="skip-rate-tier">Rate tier</Label>
+                        <ListSelect
+                          id="skip-rate-tier"
+                          value={skipTraceRateTier}
+                          onChange={(v) => setSkipTraceRateTier(v as SkipTraceRateTier | "")}
+                          placeholder="Select…"
+                          options={[
+                            { value: "", label: "—" },
+                            ...(Object.keys(SKIP_TRACE_RATE_TIER_LABELS) as SkipTraceRateTier[]).map(
+                              (tier) => ({
+                                value: tier,
+                                label: SKIP_TRACE_RATE_TIER_LABELS[tier],
+                              })
+                            ),
+                          ]}
+                        />
+                      </div>
+                      {skipTraceRateTier === "custom" && (
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor="skip-rate-custom">Custom rate ($/record)</Label>
+                          <Input
+                            id="skip-rate-custom"
+                            type="number"
+                            min={0}
+                            step="0.0001"
+                            value={skipTraceRate}
+                            onChange={(e) => setSkipTraceRate(e.target.value)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="monthly-skip-expected">Monthly skip trace expected</Label>
+                    <Input
+                      id="monthly-skip-expected"
                       type="number"
                       min={0}
-                      value={packagePriceOverride}
-                      onChange={(e) => setPackagePriceOverride(e.target.value)}
+                      max={dataMode === "package" ? packageRecordsCap : undefined}
+                      value={monthlySkipTraceExpected}
+                      onChange={(e) => setMonthlySkipTraceExpected(e.target.value)}
+                    />
+                    {dataMode === "package" && (
+                      <p className="text-xs text-ink-faint">
+                        Capped at {packageRecordsCap.toLocaleString()} records/mo for the{" "}
+                        {PACKAGE_TIER_LABELS[packageTier]} package.
+                      </p>
+                    )}
+                    <FieldError
+                      message={
+                        monthlySkipExceedsCap
+                          ? `Exceeds the ${packageRecordsCap.toLocaleString()}-record package cap.`
+                          : undefined
+                      }
                     />
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {step === "review" && (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-            <dt className="text-ink-muted">Company</dt>
-            <dd className="text-ink">{companyName}</dd>
-            <dt className="text-ink-muted">POC</dt>
-            <dd className="text-ink">
-              {pocName}
-              {pocTitle ? ` — ${pocTitle}` : ""}
-            </dd>
-            <dt className="text-ink-muted">Assigned CSR</dt>
-            <dd className="text-ink">
-              {callerRole === "csr" ? "You" : csrs.find((c) => c.id === assignedCsrId)?.name ?? "—"}
-            </dd>
-            <dt className="text-ink-muted">Associates</dt>
-            <dd className="text-ink">
-              {associates.length === 0 ? "None" : associates.map((a) => a.name).join(", ")}
-            </dd>
-            <dt className="text-ink-muted">Buy box</dt>
-            <dd className="text-ink">
-              {[
-                propertyTypes.length ? `${propertyTypes.length} property type(s)` : null,
-                states.length ? `${states.length} state(s)` : null,
-                maxArv ? `Max ARV $${Number(maxArv).toLocaleString()}` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ") || "—"}
-            </dd>
-            <dt className="text-ink-muted">Script</dt>
-            <dd className="text-ink">{script ? CLIENT_SCRIPT_LABELS[script] : "—"}</dd>
-            <dt className="text-ink-muted">Services</dt>
-            <dd className="text-ink">
-              {services
-                .map((s) =>
-                  s.type === "cold_calling"
-                    ? `Cold Calling (${s.seatCount})`
-                    : `Texting (${TEXTING_TIER_LABELS[s.textingTier]})`
-                )
-                .join(", ") || "—"}
-            </dd>
-            <dt className="text-ink-muted">Data source</dt>
-            <dd className="text-ink">
-              {dataPackageMode === "package"
-                ? `Package — ${PACKAGE_TIER_LABELS[packageTier]}`
-                : dataPackageMode === "legacy"
-                  ? "Legacy"
-                  : "Self-Provided"}
-            </dd>
-          </dl>
-        )}
+            {step === "review" && (
+              <div className="flex flex-col gap-5">
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                  <dt className="text-ink-muted">Company</dt>
+                  <dd className="text-ink">{companyName || "—"}</dd>
+                  <dt className="text-ink-muted">POC</dt>
+                  <dd className="text-ink">
+                    {pocName}
+                    {pocTitle ? ` — ${pocTitle}` : ""}
+                  </dd>
+                  <dt className="text-ink-muted">Lifecycle</dt>
+                  <dd className="text-ink">
+                    {lifecycleStage ? LIFECYCLE_STAGE_LABELS[lifecycleStage] : "—"}
+                  </dd>
+                  <dt className="text-ink-muted">Lead source</dt>
+                  <dd className="text-ink">{leadSource || "—"}</dd>
+                  <dt className="text-ink-muted">Assigned CSR</dt>
+                  <dd className="text-ink">
+                    {callerRole === "csr" ? "You" : csrs.find((c) => c.id === assignedCsrId)?.name ?? "—"}
+                  </dd>
+                  <dt className="text-ink-muted">Associates</dt>
+                  <dd className="text-ink">
+                    {associates.length === 0 ? "None" : associates.map((a) => a.name).join(", ")}
+                  </dd>
+                  <dt className="text-ink-muted">Buy box</dt>
+                  <dd className="text-ink">
+                    {[
+                      propertyTypes.length ? `${propertyTypes.length} property type(s)` : null,
+                      states.length ? `${states.length} state(s)` : null,
+                      maxArv ? `Max ARV $${Number(maxArv).toLocaleString()}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "—"}
+                  </dd>
+                  <dt className="text-ink-muted">Cold calling</dt>
+                  <dd className="text-ink">
+                    {enableColdCalling
+                      ? `${seatCount} seat(s) · ${script ? CLIENT_SCRIPT_LABELS[script] : "no script"}`
+                      : "Not enabled"}
+                  </dd>
+                  <dt className="text-ink-muted">Texting</dt>
+                  <dd className="text-ink">
+                    {enableTexting
+                      ? `${TEXTING_PACKAGE_LABELS[textingTier]}${
+                          textingFunnel ? ` · ${TEXTING_FUNNEL_LABELS[textingFunnel]} funnel` : ""
+                        }`
+                      : "Not enabled"}
+                  </dd>
+                  <dt className="text-ink-muted">Data source</dt>
+                  <dd className="text-ink">
+                    {dataMode === "package"
+                      ? `Package — ${PACKAGE_TIER_LABELS[packageTier]}${
+                          packageCommitment ? ` · ${PACKAGE_COMMITMENT_LABELS[packageCommitment]}` : ""
+                        }`
+                      : dataMode === "payg"
+                        ? "PAYG"
+                        : dataMode === "legacy"
+                          ? "Legacy"
+                          : `Self-Provided — ${dataSourceProviderName.trim() || "—"}`}
+                  </dd>
+                  <dt className="text-ink-muted">Skip tracing</dt>
+                  <dd className="text-ink">
+                    {skipTracingType === "self_provided"
+                      ? `Client — ${skipTraceProviderName.trim() || "—"}`
+                      : skipTracingType
+                        ? SKIP_TRACING_SOURCE_LABELS[skipTracingType]
+                        : "—"}
+                    {monthlySkipTraceExpected
+                      ? ` · ${Number(monthlySkipTraceExpected).toLocaleString()} expected/mo`
+                      : ""}
+                  </dd>
+                </dl>
+                {!hasAtLeastOneService && (
+                  <p role="alert" className="text-sm text-destructive">
+                    Enable at least one of cold calling or texting before creating this client.
+                  </p>
+                )}
+              </div>
+            )}
 
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          </div>
+            {error && (
+              <p role="alert" className="mt-4 text-sm text-destructive">
+                {error}
+              </p>
+            )}
+        </div>
 
-          <div className="flex gap-3">
+        <footer className="wizard-footer">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => goTo(stepIndex - 1)}
+            disabled={stepIndex === 0 || submitting}
+            className={cn("wizard-btn wizard-btn--back", stepIndex === 0 && "invisible")}
+          >
+            ← Back
+          </Button>
+          <div className="wizard-footer__spacer" />
+          {step === "review" ? (
             <Button
               type="button"
-              variant="outline"
-              onClick={() => goTo(stepIndex - 1)}
-              disabled={stepIndex === 0 || submitting}
-              className={stepIndex === 0 ? "invisible" : undefined}
+              onClick={handleCreate}
+              disabled={submitting || !hasAtLeastOneService}
+              className="wizard-btn wizard-btn--next"
             >
-              Back
+              {submitting ? "Creating…" : "Confirm & Create Client"}
             </Button>
-            {step === "review" ? (
-              <Button type="button" onClick={handleCreate} disabled={submitting}>
-                {submitting ? "Creating…" : "Confirm & Create Client"}
-              </Button>
-            ) : (
-              <Button type="button" onClick={() => goTo(stepIndex + 1)} disabled={!canContinue}>
-                Continue →
-              </Button>
-            )}
-          </div>
-        </div>
+          ) : (
+            <Button
+              type="button"
+              onClick={() => goTo(stepIndex + 1)}
+              disabled={!canContinue}
+              className="wizard-btn wizard-btn--next"
+            >
+              Continue →
+            </Button>
+          )}
+        </footer>
       </div>
     </div>
   );

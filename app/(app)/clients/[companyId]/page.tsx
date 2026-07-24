@@ -9,14 +9,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { createClient } from "@/lib/supabase/server";
-import {
-  CAMPAIGN_TYPE_LABELS,
-  PROVIDER_TYPE_LABELS,
-  DATA_SOURCE_TIER_LABELS,
-  PACKAGE_TIER_LABELS,
-  RATE_TYPE_LABELS,
-  TEXTING_TIER_LABELS,
-} from "@/lib/supabase/labels";
+import { CAMPAIGN_TYPE_LABELS } from "@/lib/supabase/labels";
 import { LogUpsellToggle } from "@/components/upsells/log-upsell-toggle";
 import {
   ClientOpportunitiesPanel,
@@ -31,6 +24,8 @@ import { AddToDataPackageToggle } from "@/components/clients/add-to-data-package
 import { ClientHeader } from "@/components/clients/client-header";
 import { BuyBoxCard } from "@/components/clients/buy-box-card";
 import { ScriptCard } from "@/components/clients/script-card";
+import { DataPackageCard } from "@/components/clients/data-package-card";
+import { ServicesPanel } from "@/components/clients/services-panel";
 import { PinnedNotesCard } from "@/components/clients/pinned-notes-card";
 import { AssociatesCard } from "@/components/clients/associates-card";
 import { InteractionTimeline } from "@/components/interactions/interaction-timeline";
@@ -51,22 +46,6 @@ import type { Database } from "@/lib/supabase/database.types";
 function formatPrice(value: number | null) {
   if (value === null) return "—";
   return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
-
-type CampaignType = Database["public"]["Enums"]["campaign_type"];
-
-function TypeIndicator({ type }: { type: CampaignType }) {
-  const isCold = type === "cold_calling";
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 text-sm ${isCold ? "text-ledger" : "text-accent-amber"}`}
-    >
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${isCold ? "bg-ledger" : "bg-accent-amber"}`}
-      />
-      {CAMPAIGN_TYPE_LABELS[type]}
-    </span>
-  );
 }
 
 // ---------------------------------------------------------------------
@@ -141,7 +120,9 @@ export default async function CompanyProfilePage({
     await Promise.all([
       supabase
         .from("campaign_services")
-        .select("id, type, name, seat_count, texting_tier, rate_type")
+        .select(
+          "id, type, name, seat_count, texting_tier, rate_type, service_start_date, texting_funnel, texting_account_name, texting_account_email"
+        )
         .eq("company_id", companyId)
         .order("created_at", { ascending: true }),
       // Package/data-sourcing config now lives on the POC client row
@@ -151,14 +132,14 @@ export default async function CompanyProfilePage({
       supabase
         .from("clients")
         .select(
-          "id, name, email, phone, title_at_company, assigned_csr_id, data_source_type, data_source_tier, package_tier, package_price, skip_tracing_type, skip_trace_rate, buy_box, script, pinned_notes, created_at"
+          "id, name, email, phone, title_at_company, preferred_contact_method, hs_object_id, lifecycle_stage, lead_source, assigned_csr_id, data_source_type, data_source_tier, data_source_provider_name, package_tier, package_price, package_commitment, package_start_date, monthly_skip_trace_expected, skip_tracing_type, skip_trace_provider_name, skip_trace_rate_tier, skip_trace_rate, buy_box, script, custom_script_url, pinned_notes, created_at"
         )
         .eq("company_id", companyId)
         .eq("is_poc", true)
         .maybeSingle(),
       supabase
         .from("clients")
-        .select("id, name, email, phone, role, preferred_contact_method")
+        .select("id, name, email, phone, role, preferred_contact_method, hs_object_id")
         .eq("company_id", companyId)
         .eq("is_poc", false)
         .order("created_at", { ascending: true }),
@@ -174,7 +155,9 @@ export default async function CompanyProfilePage({
     ]);
 
   const campaignServices = services ?? [];
-  const totalSeats = campaignServices.reduce((sum, s) => sum + s.seat_count, 0);
+  const totalSeats = campaignServices
+    .filter((s) => s.type === "cold_calling")
+    .reduce((sum, s) => sum + s.seat_count, 0);
   const campaignTypeSet = new Set(campaignServices.map((s) => s.type));
   const campaignSummary =
     campaignServices.length === 0
@@ -184,6 +167,7 @@ export default async function CompanyProfilePage({
         : `${campaignServices.length} campaigns`;
 
   let assignedCsrName: string | null = null;
+  let referredByLabel: string | null = null;
   if (pocClient?.assigned_csr_id) {
     const { data: csrUser } = await supabase
       .from("users")
@@ -191,6 +175,29 @@ export default async function CompanyProfilePage({
       .eq("id", pocClient.assigned_csr_id)
       .single();
     assignedCsrName = csrUser?.name ?? null;
+  }
+
+  if (pocClient) {
+    const { data: referral } = await supabase
+      .from("referrals")
+      .select(
+        "id, referring:clients!referrals_referring_client_id_fkey(name, company:companies(id, name))"
+      )
+      .eq("referred_client_id", pocClient.id)
+      .eq("status", "converted")
+      .order("converted_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const referring = referral?.referring as
+      | { name: string; company: { id: string; name: string } | null }
+      | null
+      | undefined;
+    if (referring) {
+      referredByLabel = referring.company?.name
+        ? `${referring.company.name} — ${referring.name}`
+        : referring.name;
+    }
   }
 
   let csrOptions: { id: string; name: string }[] = [];
@@ -400,6 +407,10 @@ export default async function CompanyProfilePage({
           email={pocClient.email}
           phone={pocClient.phone}
           title={pocClient.title_at_company}
+          preferredContactMethod={pocClient.preferred_contact_method}
+          hsObjectId={pocClient.hs_object_id}
+          lifecycleStage={pocClient.lifecycle_stage}
+          leadSource={pocClient.lead_source}
           assignedCsrId={pocClient.assigned_csr_id}
           assignedCsrName={assignedCsrName}
           csrs={csrOptions}
@@ -409,6 +420,7 @@ export default async function CompanyProfilePage({
           totalSeats={totalSeats}
           packageTier={pocClient.package_tier}
           createdAt={pocClient.created_at}
+          referredBy={referredByLabel}
         />
       ) : (
         <div>
@@ -418,14 +430,33 @@ export default async function CompanyProfilePage({
       )}
 
       {pocClient && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.3fr]">
           <div className="flex flex-col gap-4">
             <BuyBoxCard
               clientId={pocClient.id}
               buyBox={toBuyBox(pocClient.buy_box)}
               canEdit={canEditProfile}
             />
-            <ScriptCard clientId={pocClient.id} script={pocClient.script} canEdit={canEditProfile} />
+            <ScriptCard
+              clientId={pocClient.id}
+              script={pocClient.script}
+              customScriptUrl={pocClient.custom_script_url}
+              canEdit={canEditProfile}
+            />
+                        <DataPackageCard
+              dataSourceType={pocClient.data_source_type}
+              dataSourceTier={pocClient.data_source_tier}
+              dataSourceProviderName={pocClient.data_source_provider_name}
+              packageTier={pocClient.package_tier}
+              packageCommitment={pocClient.package_commitment}
+              packageStartDate={pocClient.package_start_date}
+              packagePrice={pocClient.package_price}
+              skipTracingType={pocClient.skip_tracing_type}
+              skipTraceProviderName={pocClient.skip_trace_provider_name}
+              skipTraceRateTier={pocClient.skip_trace_rate_tier}
+              skipTraceRate={pocClient.skip_trace_rate}
+              monthlySkipTraceExpected={pocClient.monthly_skip_trace_expected}
+            />
             <PinnedNotesCard
               clientId={pocClient.id}
               pinnedNotes={pocClient.pinned_notes}
@@ -449,34 +480,18 @@ export default async function CompanyProfilePage({
         </div>
       )}
 
-      <section className="flex flex-col gap-8 border-t border-border pt-8">
-        <div>
-          <p className="text-sm text-ink-muted">
-            {campaignServices.length} campaign services ·{" "}
-            <span className="tabular">{totalSeats}</span> total seats
-          </p>
-          {pocClient?.data_source_type && (
-            <p className="mt-1 text-sm text-ink-muted">
-              Data source: {PROVIDER_TYPE_LABELS[pocClient.data_source_type]}
-              {pocClient.data_source_tier
-                ? ` · ${DATA_SOURCE_TIER_LABELS[pocClient.data_source_tier]}`
-                : ""}
-              {pocClient.package_tier ? ` (${PACKAGE_TIER_LABELS[pocClient.package_tier]})` : ""}
-              {pocClient.package_price !== null
-                ? ` · ${formatPrice(pocClient.package_price)}/mo`
-                : ""}
-              {pocClient.skip_tracing_type && (
-                <>
-                  {" · "}
-                  Skip tracing: {PROVIDER_TYPE_LABELS[pocClient.skip_tracing_type]}
-                  {pocClient.skip_trace_rate !== null
-                    ? ` · ${formatPrice(pocClient.skip_trace_rate)}/record`
-                    : ""}
-                </>
-              )}
+      {/* Services + related tabs — primary profile flow (mock: below 1fr/1.3fr grid) */}
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-base font-bold text-ink">Services</h2>
+            <p className="text-sm text-ink-muted">
+              {campaignServices.length} campaign service
+              {campaignServices.length === 1 ? "" : "s"} ·{" "}
+              <span className="tabular">{totalSeats}</span> total seats
             </p>
-          )}
-          <div className="mt-4 flex gap-3">
+          </div>
+          <div className="flex gap-3">
             {callerProfile?.role === "csr" && (
               <LogUpsellToggle companyId={companyId} campaignServices={campaignServices} />
             )}
@@ -494,7 +509,7 @@ export default async function CompanyProfilePage({
             utility reaches into the subtree from the shared `group/tabs`
             wrapper to toggle the matching label's active state and the
             matching content panel's visibility. */}
-        <div className="group/tabs glass-panel rounded-[var(--radius-lg)] p-4 md:p-6">
+        <div className="group/tabs glass-panel rounded-[16px] p-4 md:p-6">
           <input type="radio" name="profile-tab" id="tab-services" className="sr-only" defaultChecked />
           <input type="radio" name="profile-tab" id="tab-datalists" className="sr-only" />
           <input type="radio" name="profile-tab" id="tab-payg" className="sr-only" />
@@ -504,7 +519,7 @@ export default async function CompanyProfilePage({
           <div
             role="radiogroup"
             aria-label="Profile sections"
-            className="mb-5 flex flex-wrap gap-2 border-b border-white/10 pb-4"
+            className="mb-5 flex flex-wrap gap-1.5 rounded-[10px] border border-white/[0.07] bg-white/[0.03] p-1"
           >
             {/* Tailwind's scanner needs literal class strings, so each tab's
                 `group-has-[#id:checked]` variant is spelled out below rather
@@ -512,69 +527,42 @@ export default async function CompanyProfilePage({
                 scanner can't statically extract). */}
             <label
               htmlFor="tab-services"
-              className="cursor-pointer rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-sm text-ink-muted backdrop-blur-sm transition-all hover:text-ink group-has-[#tab-services:checked]/tabs:border-[oklch(74%_0.15_224/0.5)] group-has-[#tab-services:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-services:checked]/tabs:text-ledger group-has-[#tab-services:checked]/tabs:shadow-[0_0_16px_0_oklch(74%_0.15_224/0.25)]"
+              className="cursor-pointer rounded-[9px] border-none bg-transparent px-3.5 py-2 text-[12.5px] font-bold text-ink-muted transition-all hover:text-ink group-has-[#tab-services:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-services:checked]/tabs:text-ink"
             >
               Services
             </label>
             <label
               htmlFor="tab-datalists"
-              className="cursor-pointer rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-sm text-ink-muted backdrop-blur-sm transition-all hover:text-ink group-has-[#tab-datalists:checked]/tabs:border-[oklch(74%_0.15_224/0.5)] group-has-[#tab-datalists:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-datalists:checked]/tabs:text-ledger group-has-[#tab-datalists:checked]/tabs:shadow-[0_0_16px_0_oklch(74%_0.15_224/0.25)]"
+              className="cursor-pointer rounded-[9px] border-none bg-transparent px-3.5 py-2 text-[12.5px] font-bold text-ink-muted transition-all hover:text-ink group-has-[#tab-datalists:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-datalists:checked]/tabs:text-ink"
             >
               Data Lists
             </label>
             <label
               htmlFor="tab-payg"
-              className="cursor-pointer rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-sm text-ink-muted backdrop-blur-sm transition-all hover:text-ink group-has-[#tab-payg:checked]/tabs:border-[oklch(74%_0.15_224/0.5)] group-has-[#tab-payg:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-payg:checked]/tabs:text-ledger group-has-[#tab-payg:checked]/tabs:shadow-[0_0_16px_0_oklch(74%_0.15_224/0.25)]"
+              className="cursor-pointer rounded-[9px] border-none bg-transparent px-3.5 py-2 text-[12.5px] font-bold text-ink-muted transition-all hover:text-ink group-has-[#tab-payg:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-payg:checked]/tabs:text-ink"
             >
               PAYG Requests
             </label>
             <label
               htmlFor="tab-upsells"
-              className="cursor-pointer rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-sm text-ink-muted backdrop-blur-sm transition-all hover:text-ink group-has-[#tab-upsells:checked]/tabs:border-[oklch(74%_0.15_224/0.5)] group-has-[#tab-upsells:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-upsells:checked]/tabs:text-ledger group-has-[#tab-upsells:checked]/tabs:shadow-[0_0_16px_0_oklch(74%_0.15_224/0.25)]"
+              className="cursor-pointer rounded-[9px] border-none bg-transparent px-3.5 py-2 text-[12.5px] font-bold text-ink-muted transition-all hover:text-ink group-has-[#tab-upsells:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-upsells:checked]/tabs:text-ink"
             >
               Upsells
             </label>
             <label
               htmlFor="tab-commission"
-              className="cursor-pointer rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-sm text-ink-muted backdrop-blur-sm transition-all hover:text-ink group-has-[#tab-commission:checked]/tabs:border-[oklch(74%_0.15_224/0.5)] group-has-[#tab-commission:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-commission:checked]/tabs:text-ledger group-has-[#tab-commission:checked]/tabs:shadow-[0_0_16px_0_oklch(74%_0.15_224/0.25)]"
+              className="cursor-pointer rounded-[9px] border-none bg-transparent px-3.5 py-2 text-[12.5px] font-bold text-ink-muted transition-all hover:text-ink group-has-[#tab-commission:checked]/tabs:bg-[oklch(74%_0.15_224/0.16)] group-has-[#tab-commission:checked]/tabs:text-ink"
             >
               Commission
             </label>
           </div>
 
           <div className="hidden group-has-[#tab-services:checked]/tabs:block">
-            <div className="glass-panel rounded-[var(--radius-lg)]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Campaign</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Seats</TableHead>
-                    <TableHead>Rate</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {campaignServices.map((cs, i) => (
-                    <TableRow
-                      key={cs.id}
-                      className={i % 2 === 1 ? "bg-surface-sunken/50" : undefined}
-                    >
-                      <TableCell className="font-medium text-ink">
-                        {cs.name ??
-                          (cs.type === "texting" && cs.texting_tier
-                            ? `Texting — ${TEXTING_TIER_LABELS[cs.texting_tier]}`
-                            : "—")}
-                      </TableCell>
-                      <TableCell>
-                        <TypeIndicator type={cs.type} />
-                      </TableCell>
-                      <TableCell className="text-right tabular">{cs.seat_count}</TableCell>
-                      <TableCell>{cs.rate_type ? RATE_TYPE_LABELS[cs.rate_type] : "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <ServicesPanel
+              services={campaignServices}
+              script={pocClient?.script ?? null}
+              customScriptUrl={pocClient?.custom_script_url ?? null}
+            />
           </div>
 
           <div className="hidden group-has-[#tab-datalists:checked]/tabs:block">
